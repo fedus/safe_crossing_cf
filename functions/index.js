@@ -1,5 +1,4 @@
 const functions = require('firebase-functions');
-
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -76,6 +75,8 @@ exports.vote = functions
           .collection('votes')
           .doc(userUuid);
 
+      const userDoc = await db.collection('users').doc(userUuid);
+
       const metaDoc = db.collection('meta').doc('meta');
 
       return db.runTransaction(async (transaction) => {
@@ -99,6 +100,10 @@ exports.vote = functions
             });
           }
         } else {
+          transaction.update(userDoc, {
+            'totalVotesCast': admin.firestore.FieldValue.increment(1),
+          });
+          
           transaction.update(crossingRef, {
             [voteEnumIndextoFirestoreProperty[vote]]: admin
                 .firestore
