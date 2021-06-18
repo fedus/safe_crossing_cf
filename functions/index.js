@@ -59,6 +59,12 @@ exports.vote = functions
         'votesOk',
         'votesTooClose',
       ];
+      const metaVoteEnumIndextoFirestoreProperty = [
+        'votesNotSure',
+        'votesOk',
+        'votesTooClose',
+        'votesTie',
+      ];
 
       functions
           .logger
@@ -75,19 +81,69 @@ exports.vote = functions
           .collection('votes')
           .doc(userUuid);
 
-      const userDoc = await db.collection('users').doc(userUuid);
+      const userDoc = db.collection('users').doc(userUuid);
 
       const metaDoc = db.collection('meta').doc('meta');
 
       return db.runTransaction(async (transaction) => {
         const voteSnapshot = await voteRef.get();
         const crossingSnapshot = await crossingRef.get();
-        const totalVotesForCrossing = crossingSnapshot.get('votesTotal');
+
+        const crossingData = crossingSnapshot.data();
+
+        const totalVotesForCrossing = crossingData.votesTotal;
+
+        const currentResult = crossingData.currentResult;
+
+        let newResult;
 
         if (voteSnapshot.exists) {
+          functions.logger.log(`User ${userUuid} has already voted`);
           const existingVote = voteSnapshot.get('vote');
 
           if (existingVote != vote) {
+            functions
+                .logger
+                .log(`User ${userUuid} wants to change their vote`);
+
+            const parsedVotes = {
+              votesNotSure: (
+                vote == 0 ?
+                crossingData.votesNotSure + 1 :
+                (existingVote == 0 ?
+                  crossingData.votesNotSure - 1 :
+                  crossingData.votesNotSure)),
+              votesOk: (
+                vote == 1 ?
+                crossingData.votesOk + 1 :
+                (existingVote == 1 ?
+                  crossingData.votesOk - 1 :
+                  crossingData.votesOk)),
+              votesTooClose: (
+                vote == 2 ?
+                crossingData.votesTooClose + 1 :
+                (existingVote == 2 ?
+                  crossingData.votesTooClose - 1 :
+                  crossingData.votesTooClose)),
+            };
+
+            if (parsedVotes.votesNotSure > parsedVotes.votesOk &&
+              parsedVotes.votesNotSure > parsedVotes.votesTooClose) {
+              newResult = 0;
+            } else if (parsedVotes.votesOk > parsedVotes.votesNotSure &&
+              parsedVotes.votesOk > parsedVotes.votesTooClose) {
+              newResult = 1;
+            } else if (parsedVotes.votesTooClose > parsedVotes.votesOk &&
+              parsedVotes.votesTooClose > parsedVotes.votesNotSure) {
+              newResult = 2;
+            } else {
+              newResult = 3;
+            }
+
+            functions
+                .logger
+                .log(`Result, old: ${currentResult}, new ${newResult}`);
+
             transaction.update(crossingRef, {
               [voteEnumIndextoFirestoreProperty[existingVote]]: admin
                   .firestore
@@ -97,28 +153,100 @@ exports.vote = functions
                   .firestore
                   .FieldValue
                   .increment(1),
+              currentResult: newResult,
             });
           }
         } else {
+          functions
+              .logger
+              .log(`User ${userUuid} is casting their first vote`);
+
           transaction.update(userDoc, {
             'totalVotesCast': admin.firestore.FieldValue.increment(1),
           });
-          
+
+          const parsedVotes = {
+            votesNotSure: (
+              vote == 0 ?
+              crossingData.votesNotSure + 1 :
+              crossingData.votesNotSure),
+            votesOk: (
+              vote == 1 ?
+              crossingData.votesOk + 1 :
+              crossingData.votesOk),
+            votesTooClose: (
+              vote == 2 ?
+              crossingData.votesTooClose + 1 :
+              crossingData.votesTooClose),
+          };
+
+          if (parsedVotes.votesNotSure > parsedVotes.votesOk &&
+            parsedVotes.votesNotSure > parsedVotes.votesTooClose) {
+            newResult = 0;
+          } else if (parsedVotes.votesOk > parsedVotes.votesNotSure &&
+            parsedVotes.votesOk > parsedVotes.votesTooClose) {
+            newResult = 1;
+          } else if (parsedVotes.votesTooClose > parsedVotes.votesOk &&
+            parsedVotes.votesTooClose > parsedVotes.votesNotSure) {
+            newResult = 2;
+          } else {
+            newResult = 3;
+          }
+
+          functions
+              .logger
+              .log(`Result, old: ${currentResult}, new ${newResult}`);
+
           transaction.update(crossingRef, {
             [voteEnumIndextoFirestoreProperty[vote]]: admin
                 .firestore
                 .FieldValue
                 .increment(1),
-            'votesTotal': admin.firestore.FieldValue.increment(1),
-            'unseenBy': admin.firestore.FieldValue.arrayRemove(userUuid),
+            votesTotal: admin.firestore.FieldValue.increment(1),
+            unseenBy: admin.firestore.FieldValue.arrayRemove(userUuid),
+            currentResult: newResult,
           });
 
           if (totalVotesForCrossing == 4) { // 5th vote was just cast
+            functions
+                .logger
+                .log(`5th vote cast, incrementing \
+                    ${metaVoteEnumIndextoFirestoreProperty[newResult]}`);
+
             transaction.update(metaDoc, {
               crossingsWithEnoughVotes: admin.firestore.FieldValue.increment(1),
+              [metaVoteEnumIndextoFirestoreProperty[newResult]]: admin
+                  .firestore
+                  .FieldValue
+                  .increment(1),
             });
           }
         }
+
+        if (totalVotesForCrossing > 4 &&
+          newResult && newResult != currentResult) {
+          functions
+              .logger
+              .log(`> 5th vote cast, incrementing \
+                  ${metaVoteEnumIndextoFirestoreProperty[newResult]} \
+                  and decrementing \
+                  ${metaVoteEnumIndextoFirestoreProperty[currentResult]}`);
+
+          transaction.update(metaDoc, {
+            [metaVoteEnumIndextoFirestoreProperty[currentResult]]: admin
+                .firestore
+                .FieldValue
+                .increment(-1),
+            [metaVoteEnumIndextoFirestoreProperty[newResult]]: admin
+                .firestore
+                .FieldValue
+                .increment(1),
+          });
+        }
+
+        functions
+            .logger
+            .log('Persisting user\'s decision');
 
         transaction.set(voteRef, {vote});
       })
