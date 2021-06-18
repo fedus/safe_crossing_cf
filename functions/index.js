@@ -6,6 +6,8 @@ admin.initializeApp();
 
 const db = admin.firestore();
 
+const nodeIdToFirestoreId = (nodeId) => nodeId.split('/')[1];
+
 exports.initializeUser = functions
     .region('europe-west1')
     .https
@@ -119,4 +121,47 @@ exports.vote = functions
       })
           .then((value) => 'Vote cast')
           .catch((error) => `Failed to cast vote: ${error}`);
+    });
+
+exports.getNextBatch = functions
+    .region('europe-west1')
+    .https
+    .onCall(async (data, context) => {
+      const {userId, quantity, lastCrossingId} = data;
+
+      functions
+          .logger
+          .log(
+              `Getting next batch of ${quantity} crossings for \
+              ${userId}, last crossing id \
+              ${lastCrossingId ? lastCrossingId : 'n/a'}`,
+          );
+
+      const crossingsCollection = db.collection('crossings');
+
+      let crossingQuery;
+
+      if (lastCrossingId) {
+        const lastCrossingFirebaseId = nodeIdToFirestoreId(lastCrossingId);
+
+        const lastCrossingReference = await crossingsCollection
+            .doc(lastCrossingFirebaseId)
+            .get();
+
+        crossingQuery = crossingsCollection
+            .where('unseenBy', 'array-contains', userId)
+            .orderBy('votesTotal')
+            .startAfter(lastCrossingReference);
+      } else {
+        crossingQuery = crossingsCollection
+            .where('unseenBy', 'array-contains', userId)
+            .orderBy('votesTotal');
+      }
+
+      const _crossingsQuerySnapshot = await crossingQuery
+          .limit(quantity)
+          .get();
+
+      return _crossingsQuerySnapshot.docs.map((crossingDocument) =>
+        crossingDocument.data());
     });
