@@ -7,6 +7,8 @@ const db = admin.firestore();
 
 const nodeIdToFirestoreId = (nodeId) => nodeId.split('/')[1];
 
+const orZero = (value) => value || 0;
+
 exports.initializeUser = functions
     .region('europe-west1')
     .https
@@ -93,6 +95,12 @@ exports.vote = functions
 
         const crossingData = crossingSnapshot.data();
 
+        const orZeroCrossingData = {
+          votesNotSure: orZero(crossingData.votesNotSure),
+          votesOk: orZero(crossingData.votesOk),
+          votesTooClose: orZero(crossingData.votesTooClose),
+        };
+
         const totalVotesForCrossing = crossingData.votesTotal;
 
         const currentResult = crossingData.currentResult;
@@ -111,22 +119,22 @@ exports.vote = functions
             const parsedVotes = {
               votesNotSure: (
                 vote == 0 ?
-                crossingData.votesNotSure + 1 :
+                orZeroCrossingData.votesNotSure + 1 :
                 (existingVote == 0 ?
-                  crossingData.votesNotSure - 1 :
-                  crossingData.votesNotSure)),
+                  orZeroCrossingData.votesNotSure - 1 :
+                  orZeroCrossingData.votesNotSure)),
               votesOk: (
                 vote == 1 ?
-                crossingData.votesOk + 1 :
+                orZeroCrossingData.votesOk + 1 :
                 (existingVote == 1 ?
-                  crossingData.votesOk - 1 :
-                  crossingData.votesOk)),
+                  orZeroCrossingData.votesOk - 1 :
+                  orZeroCrossingData.votesOk)),
               votesTooClose: (
                 vote == 2 ?
-                crossingData.votesTooClose + 1 :
+                orZeroCrossingData.votesTooClose + 1 :
                 (existingVote == 2 ?
-                  crossingData.votesTooClose - 1 :
-                  crossingData.votesTooClose)),
+                  orZeroCrossingData.votesTooClose - 1 :
+                  orZeroCrossingData.votesTooClose)),
             };
 
             if (parsedVotes.votesNotSure > parsedVotes.votesOk &&
@@ -170,16 +178,16 @@ exports.vote = functions
           const parsedVotes = {
             votesNotSure: (
               vote == 0 ?
-              crossingData.votesNotSure + 1 :
-              crossingData.votesNotSure),
+              orZeroCrossingData.votesNotSure + 1 :
+              orZeroCrossingData.votesNotSure),
             votesOk: (
               vote == 1 ?
-              crossingData.votesOk + 1 :
-              crossingData.votesOk),
+              orZeroCrossingData.votesOk + 1 :
+              orZeroCrossingData.votesOk),
             votesTooClose: (
               vote == 2 ?
-              crossingData.votesTooClose + 1 :
-              crossingData.votesTooClose),
+              orZeroCrossingData.votesTooClose + 1 :
+              orZeroCrossingData.votesTooClose),
           };
 
           if (parsedVotes.votesNotSure > parsedVotes.votesOk &&
