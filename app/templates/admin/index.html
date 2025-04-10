@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<h2>Admin Dashboard</h2>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h3>Cities Overview</h3>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>City</th>
+                        <th>Active Version</th>
+                        <th>Total Versions</th>
+                        <th>Completed Versions</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for city in cities %}
+                    <tr>
+                        <td>{{ city.name }}</td>
+                        <td>
+                            {% set active_version = city.versions|selectattr('is_active')|first %}
+                            {% if active_version %}
+                                Version {{ active_version.version_number }}
+                            {% else %}
+                                <span class="text-muted">No active version</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ city.versions|length }}</td>
+                        <td>{{ city.versions|selectattr('is_completed')|list|length }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.manage_versions', city_id=city.id) }}" class="btn btn-sm btn-info">
+                                Manage Versions
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %} 

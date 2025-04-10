@@ -1,0 +1,126 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Cities{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Cities</h2>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCityModal">
+        Add New City
+    </button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for city in cities %}
+            <tr>
+                <td>{{ city.id }}</td>
+                <td>{{ city.name }}</td>
+                <td>{{ city.description }}</td>
+                <td>
+                    {% if city.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning toggle-active" 
+                            data-city-id="{{ city.id }}"
+                            data-is-active="{{ city.is_active }}">
+                        {% if city.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                    <a href="{{ url_for('admin.manage_versions', city_id=city.id) }}" class="btn btn-sm btn-info">
+                        Manage Versions
+                    </a>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="deleteCity({{ city.id }})"
+                            {% if city.crossings %}disabled title="Cannot delete city with crossings"{% endif %}>
+                        Delete
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add City Modal -->
+<div class="modal fade" id="addCityModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New City</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.manage_cities') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">City Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Add City</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle city active status
+    document.querySelectorAll('.toggle-active').forEach(button => {
+        button.addEventListener('click', function() {
+            const cityId = this.dataset.cityId;
+            fetch(`/admin/cities/${cityId}/toggle_active`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+});
+
+function deleteCity(cityId) {
+    if (confirm('Are you sure you want to delete this city? This will also delete all its versions.')) {
+        fetch(`/admin/cities/${cityId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 

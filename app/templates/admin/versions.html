@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Versions - {{ city.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Versions - {{ city.name }}</h2>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVersionModal">
+        Add New Version
+    </button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Version</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for version in versions %}
+            <tr>
+                <td>{{ version.version_number }}</td>
+                <td>{{ version.description }}</td>
+                <td>
+                    {% if version.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% endif %}
+                    {% if version.is_completed %}
+                        <span class="badge bg-info">Completed</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning toggle-active" 
+                            data-version-id="{{ version.id }}"
+                            data-is-active="{{ version.is_active }}">
+                        {% if version.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-info toggle-completed" 
+                            data-version-id="{{ version.id }}"
+                            data-is-completed="{{ version.is_completed }}">
+                        {% if version.is_completed %}Mark Incomplete{% else %}Mark Complete{% endif %}
+                    </button>
+                    <button class="btn btn-sm btn-danger" 
+                            onclick="deleteVersion({{ version.id }})"
+                            {% if version.crossings %}disabled title="Cannot delete version with crossings"{% endif %}>
+                        Delete
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Version Modal -->
+<div class="modal fade" id="addVersionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Version</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin.manage_versions', city_id=city.id) }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="version_number" class="form-label">Version Number</label>
+                        <input type="number" class="form-control" id="version_number" name="version_number" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Add Version</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle version active status
+    document.querySelectorAll('.toggle-active').forEach(button => {
+        button.addEventListener('click', function() {
+            const versionId = this.dataset.versionId;
+            fetch(`/admin/versions/${versionId}/toggle_active`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+
+    // Toggle version completed status
+    document.querySelectorAll('.toggle-completed').forEach(button => {
+        button.addEventListener('click', function() {
+            const versionId = this.dataset.versionId;
+            fetch(`/admin/versions/${versionId}/toggle_completed`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        });
+    });
+});
+
+function deleteVersion(versionId) {
+    if (confirm('Are you sure you want to delete this version?')) {
+        fetch(`/admin/versions/${versionId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 
