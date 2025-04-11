@@ -1,35 +1,195 @@
-# Safe Crossing API Documentation
+# Safe Crossing CF
+
+A Flask application for managing safe crossing operations.
+
+## Development Setup
+
+1. Create and activate a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
+
+4. Initialize the database:
+```bash
+flask db init
+flask db migrate -m "Initial migration"
+flask db upgrade
+```
+
+5. Run the development server:
+```bash
+flask run
+```
+
+## Docker Deployment
+
+This application is fully containerized and ready for production deployment using Gunicorn as a WSGI server. Here's how to run it using Docker:
+
+### Prerequisites
+
+- Docker and Docker Compose installed on your system
+
+### Quick Start
+
+1. Clone the repository:
+   ```bash
+   git clone [repository-url]
+   cd safe_crossing_cf
+   ```
+
+2. Create a `.env` file from the example:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Edit the `.env` file to configure your environment:
+   ```
+   SECRET_KEY=your-secure-secret-key
+   DATABASE_URL=sqlite:///instance/safe_crossing.db
+   FLASK_ENV=production
+   # Admin password will be prompted during first run if not set here
+   ADMIN_PASSWORD=your-secure-admin-password
+   ```
+
+4. Build and start the application:
+   ```bash
+   docker compose up -d
+   ```
+
+5. Access the application at http://localhost:5000
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| SECRET_KEY | Flask secret key for sessions | change-this-in-production |
+| DATABASE_URL | Database connection URL | sqlite:///instance/safe_crossing.db |
+| ADMIN_PASSWORD | Password for the admin user | (empty - will prompt during setup) |
+| PORT | Port to run the application on | 5000 |
+| FLASK_ENV | Flask environment | production |
+| FLASK_DEBUG | Enable debug mode | false |
+| FLASK_HOST | Host to bind the server to | 0.0.0.0 |
+| FLASK_PORT | Port for the Flask app | 5000 |
+
+### Database Management
+
+The application uses Alembic for database migrations. Migrations run automatically when the container starts.
+
+To manually run migrations or create a new migration:
+
+```bash
+# Run migrations
+docker compose exec web flask db upgrade
+
+# Create a new migration after model changes
+docker compose exec web flask db migrate -m "Description of changes"
+```
+
+### Admin Password Reset
+
+To reset the admin password:
+
+```bash
+# Interactive (will prompt for password)
+docker compose exec web python update_admin_password.py
+```
+
+Or specify a new password directly:
+
+```bash
+docker compose exec web python update_admin_password.py --password new-password
+```
+
+### Production Deployment Considerations
+
+- Use a proper database like PostgreSQL instead of SQLite
+- Set a strong SECRET_KEY
+- Configure proper SSL/TLS with a reverse proxy like Nginx
+- Consider using Docker Swarm or Kubernetes for high availability
+- The application runs with Gunicorn in production for better performance and stability
+
+## Database Migrations
+
+To create a new migration:
+```bash
+flask db migrate -m "Description of changes"
+flask db upgrade
+```
+
+To rollback a migration:
+```bash
+flask db downgrade
+```
+
+## Admin Password Reset
+
+To reset the admin password:
+```bash
+# Interactive (will prompt for password)
+python update_admin_password.py
+
+# Or with a specific password:
+python update_admin_password.py --password your_new_password
+
+# Or using an environment variable:
+ADMIN_PASSWORD=your_new_password python update_admin_password.py
+```
+
+## Database Initialization
+
+To initialize the database:
+```bash
+# Interactive (will prompt for admin password)
+python init_db.py
+
+# Or with a specific admin password:
+python init_db.py --password your_admin_password
+
+# Or using an environment variable:
+ADMIN_PASSWORD=your_admin_password python init_db.py
+```
+
+## Configuration
+
+The application can be configured through environment variables:
+
+- `FLASK_APP`: Application entry point (default: run.py)
+- `FLASK_ENV`: Environment (development/production)
+- `FLASK_DEBUG`: Enable debug mode (true/false)
+- `SECRET_KEY`: Secret key for session management
+- `DATABASE_URL`: Database connection URL
+- `ADMIN_PASSWORD`: Admin user password
+- `FLASK_HOST`: Host to bind the server to (default: 0.0.0.0 in Docker)
+- `FLASK_PORT`: Port for the Flask app (default: 5000 in Docker)
+
+## Security Notes
+
+- Never commit the .env file to version control
+- Use strong, unique passwords for admin accounts
+- In production, always use HTTPS
+- Keep dependencies updated
+- Never run the application in debug mode in production
+
+# Safe Crossing Server API Documentation
 
 ## Project Overview
 
 Safe Crossing is a crowdsourced initiative aimed at assessing pedestrian crossings in Luxembourg-City for compliance with safety standards. The project specifically focuses on analyzing whether parking spots are located within five meters of pedestrian crossings, which is prohibited according to the Code de la Route (Highway Code).
 
-### Key Results
-- 1,787 pedestrian crossings analyzed
-- 475 (27%) crossings likely in violation of the Code de la Route
-- 162 (9%) crossings with no possible assessment
-- 1,150 (64%) crossings assessed as compliant
-
 ### Project Background
 The project was launched in response to ongoing safety concerns for pedestrians in Luxembourg-City. Despite previous audits on pedestrian security in 2015, many crossings remained non-compliant with safety regulations. The initiative gained significant media attention and prompted discussions about urban safety and transparency in city governance.
-
-### Data Collection Process
-- Data was collected from June to August 2021
-- Approximately 20 active volunteers participated
-- Each crossing received at least 5 votes to ensure robust assessment
-- Volunteers used a custom mobile application with satellite imagery
-- Distance measurements were made using a 5-meter radius tool
-- Three possible assessments:
-  - Compliant (no parking within 5 meters)
-  - Non-compliant (parking within 5 meters)
-  - Unable to assess (e.g., due to visibility issues)
-
-### Legal Basis
-The project is based on Articles 164(2.)(e) and 166(h) of the Code de la Route, which prohibit parking within 5 meters of pedestrian crossings. The Ministry of Mobility and Public Works (MMTP) has confirmed that while parking spots may exist near crossings, parking on them is prohibited.
-
-### Data Sources
-- Pedestrian crossing locations: OpenStreetMap
-- Satellite imagery: Geoportail (2020 Ortho-Photos)
 
 ### Disclaimer
 This is a crowdsourced effort. While the data has been collected and processed with care, no absolute guarantees can be made regarding its accuracy. Users should verify information independently before making decisions based on this data.

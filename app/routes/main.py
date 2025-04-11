@@ -123,4 +123,8 @@ def get_stats():
         'votes_ok': meta.votes_ok,
         'votes_too_close': meta.votes_too_close,
         'votes_tie': meta.votes_tie
-    }) 
+    })
+
+@bp.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200 
