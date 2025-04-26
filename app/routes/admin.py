@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.models.models import City, CityVersion, db
+from app.models.models import City, CityVersion, Crossing, db
 from functools import wraps
+import json
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -142,4 +143,91 @@ def toggle_city_active(city_id):
     city.is_active = not city.is_active
     db.session.commit()
     
-    return jsonify({'success': True, 'is_active': city.is_active}) 
+    return jsonify({'success': True, 'is_active': city.is_active})
+
+@admin_bp.route('/cities/<int:city_id>/versions/<int:version_id>/crossings', methods=['GET'])
+@login_required
+@admin_required
+def manage_crossings(city_id, version_id):
+    city = City.query.get_or_404(city_id)
+    version = CityVersion.query.get_or_404(version_id)
+    crossings = Crossing.query.filter_by(city_id=city_id, version_id=version_id).all()
+    return render_template('admin/crossings.html', city=city, version=version, crossings=crossings)
+
+@admin_bp.route('/crossings/bulk-import', methods=['POST'])
+@login_required
+@admin_required
+def bulk_import_crossings():
+    try:
+        data = request.get_json()
+        crossings_data = data.get('crossings', [])
+        city_id = data.get('city_id')
+        version_id = data.get('version_id')
+        
+        if not all([city_id, version_id]):
+            return jsonify({'error': 'City ID and Version ID are required'}), 400
+            
+        # Verify city and version exist
+        city = City.query.get(city_id)
+        version = CityVersion.query.get(version_id)
+        if not city or not version:
+            return jsonify({'error': 'Invalid city or version'}), 400
+            
+        # Process each crossing
+        for crossing_data in crossings_data:
+            crossing = Crossing(
+                id=crossing_data.get('nodeId'),
+                city_id=city_id,
+                version_id=version_id,
+                lat=crossing_data.get('lat'),
+                lon=crossing_data.get('lon'),
+                neighbourhood=crossing_data.get('neighbourhood'),
+                street=crossing_data.get('street')
+            )
+            db.session.add(crossing)
+            
+        db.session.commit()
+        return jsonify({'message': f'Successfully imported {len(crossings_data)} crossings'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/crossings/<path:crossing_id>', methods=['PUT'])
+@login_required
+@admin_required
+def update_crossing(crossing_id):
+    try:
+        crossing = Crossing.query.get_or_404(crossing_id)
+        data = request.get_json()
+        
+        # Update fields if provided
+        if 'lat' in data:
+            crossing.lat = data['lat']
+        if 'lon' in data:
+            crossing.lon = data['lon']
+        if 'neighbourhood' in data:
+            crossing.neighbourhood = data['neighbourhood']
+        if 'street' in data:
+            crossing.street = data['street']
+            
+        db.session.commit()
+        return jsonify({'message': 'Crossing updated successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_bp.route('/crossings/<path:crossing_id>', methods=['DELETE'])
+@login_required
+@admin_required
+def delete_crossing(crossing_id):
+    try:
+        crossing = Crossing.query.get_or_404(crossing_id)
+        db.session.delete(crossing)
+        db.session.commit()
+        return jsonify({'message': 'Crossing deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500 

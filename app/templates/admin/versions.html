@@ -34,6 +34,10 @@
                     {% endif %}
                 </td>
                 <td>
+                    <a href="{{ url_for('admin.manage_crossings', city_id=city.id, version_id=version.id) }}" 
+                       class="btn btn-sm btn-primary">
+                        Manage Crossings
+                    </a>
                     <button class="btn btn-sm btn-warning toggle-active" 
                             data-version-id="{{ version.id }}"
                             data-is-active="{{ version.is_active }}">

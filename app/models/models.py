@@ -50,6 +50,8 @@ class Crossing(db.Model):
     version_id = db.Column(db.Integer, db.ForeignKey('city_version.id'), nullable=False)
     lat = db.Column(db.Float, nullable=False)
     lon = db.Column(db.Float, nullable=False)
+    neighbourhood = db.Column(db.String(100), nullable=True)
+    street = db.Column(db.String(100), nullable=True)
     votes_not_sure = db.Column(db.Integer, default=0)
     votes_ok = db.Column(db.Integer, default=0)
     votes_too_close = db.Column(db.Integer, default=0)
@@ -62,7 +64,6 @@ class Crossing(db.Model):
     city = db.relationship('City', backref='crossings')
     version = db.relationship('CityVersion', backref='crossings')
     votes = db.relationship('Vote', backref='crossing', lazy=True)
-    unseen_by = db.relationship('UnseenCrossing', backref='crossing', lazy=True)
 
 class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -71,13 +72,6 @@ class Vote(db.Model):
     vote = db.Column(db.Integer, nullable=False)  # 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    __table_args__ = (db.UniqueConstraint('user_id', 'crossing_id'),)
-
-class UnseenCrossing(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
-    crossing_id = db.Column(db.String(36), db.ForeignKey('crossing.id'), nullable=False)
     
     __table_args__ = (db.UniqueConstraint('user_id', 'crossing_id'),)
 

@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app import db
-from app.models.models import User, Crossing, Vote, UnseenCrossing, Meta
+from app.models.models import User, Crossing, Vote, Meta, City, CityVersion
 from sqlalchemy import func
 import uuid
 
@@ -19,18 +19,10 @@ def initialize_user():
     if user and user.initialized:
         return jsonify({'status': 'USER_ALREADY_INITIALIZED'})
     
-    # Get all crossings
-    crossings = Crossing.query.all()
-    
     # Create user if not exists
     if not user:
         user = User(id=user_uuid)
         db.session.add(user)
-    
-    # Mark all crossings as unseen by this user
-    for crossing in crossings:
-        unseen = UnseenCrossing(user_id=user_uuid, crossing_id=crossing.id)
-        db.session.add(unseen)
     
     user.initialized = True
     db.session.commit()
@@ -79,12 +71,6 @@ def vote():
         crossing.votes_total += 1
         user = User.query.get(user_uuid)
         user.total_votes_cast += 1
-        
-        # Remove from unseen
-        UnseenCrossing.query.filter_by(
-            user_id=user_uuid,
-            crossing_id=crossing_node_id
-        ).delete()
     
     # Add new vote
     votes[vote_enum_to_string(vote_value)] += 1
@@ -184,4 +170,75 @@ def get_user_votes(user_uuid):
         'crossing_id': v.crossing_id,
         'vote': v.vote,
         'created_at': v.created_at.isoformat()
-    } for v in votes]) 
+    } for v in votes])
+
+@bp.route('/cities', methods=['GET'])
+def get_cities():
+    cities = City.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': city.id,
+        'name': city.name,
+        'description': city.description,
+        'versions': [{
+            'id': version.id,
+            'version_number': version.version_number,
+            'description': version.description,
+            'is_active': version.is_active,
+            'is_completed': version.is_completed
+        } for version in city.versions if version.is_active]
+    } for city in cities])
+
+@bp.route('/cities/<int:city_id>/versions/<int:version_id>/crossings', methods=['GET'])
+def get_city_version_crossings(city_id, version_id):
+    crossings = Crossing.query.filter_by(
+        city_id=city_id,
+        version_id=version_id
+    ).all()
+    
+    return jsonify([{
+        'id': c.id,
+        'lat': c.lat,
+        'lon': c.lon,
+        'neighbourhood': c.neighbourhood,
+        'street': c.street,
+        'votes_not_sure': c.votes_not_sure,
+        'votes_ok': c.votes_ok,
+        'votes_too_close': c.votes_too_close,
+        'votes_total': c.votes_total,
+        'current_result': c.current_result
+    } for c in crossings])
+
+@bp.route('/cities/<int:city_id>/versions/<int:version_id>/unvoted', methods=['GET'])
+def get_unvoted_crossings(city_id, version_id):
+    user_uuid = request.args.get('userUuid')
+    if not user_uuid:
+        return jsonify({'error': 'userUuid is required'}), 400
+    
+    # Get all crossings for this city/version
+    all_crossings = Crossing.query.filter_by(
+        city_id=city_id,
+        version_id=version_id
+    ).all()
+    
+    # Get user's votes for these crossings
+    voted_crossing_ids = set(
+        v.crossing_id for v in Vote.query.filter_by(user_id=user_uuid).all()
+    )
+    
+    # Filter out voted crossings
+    unvoted_crossings = [
+        c for c in all_crossings if c.id not in voted_crossing_ids
+    ]
+    
+    return jsonify([{
+        'id': c.id,
+        'lat': c.lat,
+        'lon': c.lon,
+        'neighbourhood': c.neighbourhood,
+        'street': c.street,
+        'votes_not_sure': c.votes_not_sure,
+        'votes_ok': c.votes_ok,
+        'votes_too_close': c.votes_too_close,
+        'votes_total': c.votes_total,
+        'current_result': c.current_result
+    } for c in unvoted_crossings]) 

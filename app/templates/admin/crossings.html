@@ -1,0 +1,299 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Manage Crossings - {{ city.name }} (Version {{ version.version_number }}){% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Crossings - {{ city.name }} (Version {{ version.version_number }})</h2>
+    <div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
+            Bulk Import
+        </button>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCrossingModal">
+            Add Single Crossing
+        </button>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Node ID</th>
+                <th>Neighbourhood</th>
+                <th>Street</th>
+                <th>Position</th>
+                <th>Votes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for crossing in crossings %}
+            <tr>
+                <td>{{ crossing.id }}</td>
+                <td>{{ crossing.neighbourhood }}</td>
+                <td>{{ crossing.street }}</td>
+                <td>{{ crossing.lat }}, {{ crossing.lon }}</td>
+                <td>
+                    <span class="badge bg-success">{{ crossing.votes_ok }}</span>
+                    <span class="badge bg-danger">{{ crossing.votes_too_close }}</span>
+                    <span class="badge bg-warning">{{ crossing.votes_not_sure }}</span>
+                    <span class="badge bg-info">{{ crossing.votes_total }}</span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-warning" onclick="editCrossing('{{ crossing.id }}')">
+                        Edit
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCrossing('{{ crossing.id }}')">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal fade" id="bulkImportModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Bulk Import Crossings</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="crossingsData" class="form-label">Crossings Data (JSON)</label>
+                    <textarea class="form-control" id="crossingsData" rows="10" placeholder='[
+  {
+    "nodeId": "node/123456789",
+    "lat": 49.6116,
+    "lon": 6.1319,
+    "neighbourhood": "Rollingergrund",
+    "street": "CR 181"
+  }
+]'></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="bulkImport()">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Single Crossing Modal -->
+<div class="modal fade" id="addCrossingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Single Crossing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="nodeId" class="form-label">Node ID</label>
+                    <input type="text" class="form-control" id="nodeId" required>
+                </div>
+                <div class="mb-3">
+                    <label for="neighbourhood" class="form-label">Neighbourhood</label>
+                    <input type="text" class="form-control" id="neighbourhood">
+                </div>
+                <div class="mb-3">
+                    <label for="street" class="form-label">Street</label>
+                    <input type="text" class="form-control" id="street">
+                </div>
+                <div class="mb-3">
+                    <label for="lat" class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-control" id="lat" required>
+                </div>
+                <div class="mb-3">
+                    <label for="lon" class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-control" id="lon" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="addSingleCrossing()">Add</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Crossing Modal -->
+<div class="modal fade" id="editCrossingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Crossing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editNodeId">
+                <div class="mb-3">
+                    <label for="editNeighbourhood" class="form-label">Neighbourhood</label>
+                    <input type="text" class="form-control" id="editNeighbourhood">
+                </div>
+                <div class="mb-3">
+                    <label for="editStreet" class="form-label">Street</label>
+                    <input type="text" class="form-control" id="editStreet">
+                </div>
+                <div class="mb-3">
+                    <label for="editLat" class="form-label">Latitude</label>
+                    <input type="number" step="any" class="form-control" id="editLat" required>
+                </div>
+                <div class="mb-3">
+                    <label for="editLon" class="form-label">Longitude</label>
+                    <input type="number" step="any" class="form-control" id="editLon" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="updateCrossing()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function bulkImport() {
+    const crossingsData = document.getElementById('crossingsData').value;
+    try {
+        const data = {
+            city_id: {{ city.id }},
+            version_id: {{ version.id }},
+            crossings: JSON.parse(crossingsData)
+        };
+        
+        fetch('/admin/crossings/bulk-import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert('Error: ' + data.error);
+            } else {
+                alert(data.message);
+                location.reload();
+            }
+        });
+    } catch (e) {
+        alert('Invalid JSON format');
+    }
+}
+
+function addSingleCrossing() {
+    const data = {
+        city_id: {{ city.id }},
+        version_id: {{ version.id }},
+        crossings: [{
+            nodeId: document.getElementById('nodeId').value,
+            lat: parseFloat(document.getElementById('lat').value),
+            lon: parseFloat(document.getElementById('lon').value),
+            neighbourhood: document.getElementById('neighbourhood').value,
+            street: document.getElementById('street').value
+        }]
+    };
+    
+    fetch('/admin/crossings/bulk-import', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            alert(data.message);
+            location.reload();
+        }
+    });
+}
+
+function editCrossing(nodeId) {
+    // Find the crossing in the table using a more compatible approach
+    const rows = document.querySelectorAll('tbody tr');
+    for (const row of rows) {
+        if (row.children[0].textContent === nodeId) {
+            document.getElementById('editNodeId').value = nodeId;
+            document.getElementById('editNeighbourhood').value = row.children[1].textContent;
+            document.getElementById('editStreet').value = row.children[2].textContent;
+            const [lat, lon] = row.children[3].textContent.split(', ');
+            document.getElementById('editLat').value = lat;
+            document.getElementById('editLon').value = lon;
+            
+            new bootstrap.Modal(document.getElementById('editCrossingModal')).show();
+            break;
+        }
+    }
+}
+
+function updateCrossing() {
+    const nodeId = document.getElementById('editNodeId').value;
+    const data = {
+        lat: parseFloat(document.getElementById('editLat').value),
+        lon: parseFloat(document.getElementById('editLon').value),
+        neighbourhood: document.getElementById('editNeighbourhood').value,
+        street: document.getElementById('editStreet').value
+    };
+    
+    fetch(`/admin/crossings/${encodeURIComponent(nodeId)}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error('Failed to update crossing');
+        }
+    })
+    .then(data => {
+        alert(data.message);
+        location.reload();
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+function deleteCrossing(nodeId) {
+    if (confirm('Are you sure you want to delete this crossing?')) {
+        fetch(`/admin/crossings/${encodeURIComponent(nodeId)}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                throw new Error('Failed to delete crossing');
+            }
+        })
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        });
+    }
+}
+</script>
+{% endblock %} 
