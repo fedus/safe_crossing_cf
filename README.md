@@ -249,85 +249,86 @@ All API endpoints are relative to the base URL: `http://localhost:5001`
 
 ### Crossings
 
-#### Get All Crossings
-- **URL:** `/api/crossings`
+#### Get Active Cities
+- **URL:** `/api/cities/active`
 - **Method:** `GET`
-- **Description:** Retrieves all crossings in the database
+- **Description:** Retrieves a list of all active cities
 - **Response:**
   ```json
   [
     {
       "id": "string",
-      "city": "string",
-      "version": "number",
-      "votes_not_sure": "number",
-      "votes_ok": "number",
-      "votes_too_close": "number",
-      "votes_total": "number",
-      "current_result": "number"  // 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE, 3: TIE
+      "name": "string",
+      "is_active": true
     }
   ]
   ```
 
-#### Get Single Crossing
-- **URL:** `/api/crossings/<crossing_id>`
+#### Get Active Versions
+- **URL:** `/api/versions/active`
 - **Method:** `GET`
-- **Description:** Retrieves information about a specific crossing
+- **Description:** Retrieves a list of all active versions
 - **Response:**
   ```json
-  {
-    "id": "string",
-    "city": "string",
-    "version": "number",
-    "votes_not_sure": "number",
-    "votes_ok": "number",
-    "votes_too_close": "number",
-    "votes_total": "number",
-    "current_result": "number"  // 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE, 3: TIE
-  }
+  [
+    {
+      "id": "string",
+      "name": "string",
+      "is_active": true
+    }
+  ]
   ```
-- **Error Responses:**
-  - `404 Not Found`: If crossing_id does not exist
+
+#### Get Crossings
+- **URL:** `/api/crossings`
+- **Method:** `GET`
+- **Description:** Retrieves all crossings with optional filtering
+- **Query Parameters:**
+  - `city_id`: Filter by city ID
+  - `version_id`: Filter by version ID
+- **Response:**
   ```json
-  {
-    "error": "Crossing not found"
-  }
+  [
+    {
+      "id": "string",
+      "name": "string",
+      "latitude": "float",
+      "longitude": "float",
+      "city_id": "string",
+      "version_id": "string",
+      "votes": {
+        "total": 0,
+        "ok": 0,
+        "too_close": 0,
+        "not_sure": 0
+      }
+    }
+  ]
   ```
 
-### Voting
-
-#### Cast a Vote
-- **URL:** `/api/vote`
+#### Submit Vote
+- **URL:** `/api/votes`
 - **Method:** `POST`
-- **Description:** Records a user's vote for a specific crossing
+- **Description:** Submits a vote for a crossing
 - **Request Body:**
   ```json
   {
     "userUuid": "string",
-    "crossingNodeId": "string",
-    "vote": "number"  // 0: Not sure, 1: OK, 2: Too close
+    "crossingId": "string",
+    "vote": 0  // 0: Not sure, 1: OK, 2: Too close
   }
   ```
 - **Response:**
   ```json
   {
     "status": "VOTE_RECORDED",
-    "new_result": "number"  // 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE, 3: TIE
+    "message": "Vote successfully recorded"
   }
   ```
 - **Error Responses:**
-  - `400 Bad Request`: If any required parameter is missing
-  ```json
-  {
-    "error": "Missing required parameters"
-  }
-  ```
-  - `404 Not Found`: If crossing does not exist
-  ```json
-  {
-    "error": "Crossing not found"
-  }
-  ```
+  - `400 Bad Request`: If required fields are missing or invalid
+  - `404 Not Found`: If crossing or user not found
+  - `409 Conflict`: If user has already voted for this crossing
 
 ## Vote Values
 
@@ -384,4 +385,43 @@ You can use the provided `populate_test_data.py` script to automatically populat
 python populate_test_data.py --votes 5
 ```
 
-The script initializes test users and casts random votes for each crossing in the database. The `--votes` parameter specifies how many votes to cast per crossing. 
+The script initializes test users and casts random votes for each crossing in the database. The `--votes` parameter specifies how many votes to cast per crossing.
+
+## Admin Panel Features
+
+The admin panel provides comprehensive management capabilities for the Safe Crossing application:
+
+### Crossings Management
+- Bulk import of crossings via CSV
+- Individual crossing creation and editing
+- Crossing deletion
+- View crossing details including vote statistics
+- Filter crossings by city and version
+
+### User Management
+- View user statistics
+- Monitor user activity
+- Manage user access
+
+### Data Management
+- Database migrations
+- Backup and restore functionality
+- Data export capabilities
+
+## Development Status
+
+The project is actively maintained and regularly updated with new features and improvements. Current development focuses on:
+
+- Enhanced API documentation
+- Improved data validation
+- Performance optimizations
+- Security enhancements
+- User experience improvements
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
