@@ -1,7 +1,7 @@
 """Add neighbourhood and street fields, remove unseen_crossing table
 
 Revision ID: 6935ec650e02
-Revises: 37226d6e114d
+Revises: 5ebf212a4a56
 Create Date: 2025-04-26 11:18:31.471233
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '6935ec650e02'
-down_revision: Union[str, None] = '37226d6e114d'
+down_revision: Union[str, None] = '5ebf212a4a56'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,7 +1,7 @@
 """Add information_text to City model
 
 Revision ID: 5ebf212a4a56
-Revises: 
+Revises: 37226d6e114d
 Create Date: 2023-05-01 12:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
 revision = '5ebf212a4a56'
-down_revision = None
+down_revision = '37226d6e114d'
 branch_labels = None
 depends_on = None
 

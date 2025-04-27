@@ -34,8 +34,16 @@
                 </div>
                 <div class="mb-3">
                     <label for="information_text" class="form-label">Information Text (HTML)</label>
-                    <textarea class="form-control" id="information_text" name="information_text" rows="10">{{ city.information_text or "" }}</textarea>
+                    <textarea class="form-control" id="information_text" name="information_text" rows="5">{{ city.information_text or '' }}</textarea>
                     <small class="text-muted">This content can include HTML and will be displayed to users in the app.</small>
+                </div>
+                <div class="mb-3">
+                    <label for="icon_url" class="form-label">Icon URL</label>
+                    <input type="text" class="form-control" id="icon_url" name="icon_url" value="{{ city.icon_url or '' }}" placeholder="https://img.icons8.com/color/48/000000/castle.png">
+                </div>
+                <div class="mb-3">
+                    <label for="subtitle" class="form-label">Subtitle</label>
+                    <input type="text" class="form-control" id="subtitle" name="subtitle" value="{{ city.subtitle or '' }}" placeholder="City of bridges and crossings.">
                 </div>
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary">Update City</button>

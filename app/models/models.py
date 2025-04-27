@@ -26,6 +26,8 @@ class City(db.Model):
     name = db.Column(db.String(100), nullable=False, unique=True)
     description = db.Column(db.Text)
     information_text = db.Column(db.Text)  # New field for HTML content
+    icon_url = db.Column(db.String(255))  # URL for city icon
+    subtitle = db.Column(db.String(255))  # Short tagline for the city
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

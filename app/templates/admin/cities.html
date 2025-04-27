@@ -16,6 +16,8 @@
             <tr>
                 <th>ID</th>
                 <th>Name</th>
+                <th>Icon</th>
+                <th>Subtitle</th>
                 <th>Description</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -26,6 +28,14 @@
             <tr>
                 <td>{{ city.id }}</td>
                 <td>{{ city.name }}</td>
+                <td>
+                    {% if city.icon_url %}
+                        <img src="{{ city.icon_url }}" alt="Icon" style="max-height: 30px;">
+                    {% else %}
+                        <span class="text-muted">No icon</span>
+                    {% endif %}
+                </td>
+                <td>{{ city.subtitle or "" }}</td>
                 <td>{{ city.description }}</td>
                 <td>
                     {% if city.is_active %}
@@ -71,6 +81,14 @@
                     <div class="mb-3">
                         <label for="information_text" class="form-label">Information Text (HTML)</label>
                         <textarea class="form-control" id="information_text" name="information_text" rows="5"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="icon_url" class="form-label">Icon URL</label>
+                        <input type="text" class="form-control" id="icon_url" name="icon_url" placeholder="https://img.icons8.com/color/48/000000/castle.png">
+                    </div>
+                    <div class="mb-3">
+                        <label for="subtitle" class="form-label">Subtitle</label>
+                        <input type="text" class="form-control" id="subtitle" name="subtitle" placeholder="City of bridges and crossings.">
                     </div>
                 </div>
                 <div class="modal-footer">

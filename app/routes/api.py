@@ -198,7 +198,9 @@ def get_cities():
             'id': city.id,
             'name': city.name,
             'informationText': city.information_text or "",
-            'currentVersion': current_version
+            'currentVersion': current_version,
+            'icon_url': city.icon_url or "",
+            'subtitle': city.subtitle or ""
         })
     
     return jsonify(result)

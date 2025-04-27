@@ -22,10 +22,34 @@ fi
 echo "Running database migrations..."
 gosu appuser flask db upgrade # Run as appuser
 
-# Create admin user if it doesn't exist (run checks/creation as appuser)
+# Create admin user if it doesn't exist
 echo "Checking for admin user..."
-gosu appuser python -c "from app import create_app, db; from app.models.models import User; app = create_app(); app.app_context().push(); admin = User.query.get('admin'); exit(0 if admin else 1)" || \
-gosu appuser python -c "from app import create_app, db; from app.models.models import User; import os; app = create_app(); app.app_context().push(); admin = User(id='admin', is_admin=True); admin_password = os.getenv('ADMIN_PASSWORD'); if not admin_password: print('WARNING: No ADMIN_PASSWORD set. Set a secure password immediately!'); admin_password = 'CHANGE_ME_IMMEDIATELY'; admin.set_password(admin_password); db.session.add(admin); db.session.commit(); print('Admin user created');"
+# First check if admin exists
+admin_exists=$(gosu appuser python -c "from app import create_app, db; from app.models.models import User; app = create_app(); app.app_context().push(); print('1' if User.query.get('admin') else '0')")
+
+if [ "$admin_exists" = "0" ]; then
+    echo "Creating admin user..."
+    # Set default admin password if not provided
+    admin_password=${ADMIN_PASSWORD:-CHANGE_ME_IMMEDIATELY}
+    if [ "$admin_password" = "CHANGE_ME_IMMEDIATELY" ]; then
+        echo "WARNING: No ADMIN_PASSWORD set. Set a secure password immediately!"
+    fi
+    
+    # Create admin user with multi-line Python script
+    gosu appuser python -c "
+from app import create_app, db
+from app.models.models import User
+app = create_app()
+with app.app_context():
+    admin = User(id='admin', is_admin=True)
+    admin.set_password('$admin_password')
+    db.session.add(admin)
+    db.session.commit()
+    print('Admin user created')
+"
+else
+    echo "Admin user already exists"
+fi
 
 # Execute the CMD from the Dockerfile as appuser
 # The original CMD is passed as arguments "$@"

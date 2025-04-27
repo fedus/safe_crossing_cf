@@ -30,12 +30,15 @@ def manage_cities():
         name = request.form.get('name')
         description = request.form.get('description')
         information_text = request.form.get('information_text', '')
+        icon_url = request.form.get('icon_url', '')
+        subtitle = request.form.get('subtitle', '')
         
         if not name:
             flash('City name is required', 'error')
             return redirect(url_for('admin.manage_cities'))
             
-        city = City(name=name, description=description, information_text=information_text)
+        city = City(name=name, description=description, information_text=information_text, 
+                    icon_url=icon_url, subtitle=subtitle)
         db.session.add(city)
         db.session.commit()
         flash('City added successfully', 'success')
@@ -54,6 +57,8 @@ def edit_city(city_id):
         name = request.form.get('name')
         description = request.form.get('description')
         information_text = request.form.get('information_text', '')
+        icon_url = request.form.get('icon_url', '')
+        subtitle = request.form.get('subtitle', '')
         
         if not name:
             flash('City name is required', 'error')
@@ -62,6 +67,8 @@ def edit_city(city_id):
         city.name = name
         city.description = description
         city.information_text = information_text
+        city.icon_url = icon_url
+        city.subtitle = subtitle
         db.session.commit()
         
         flash('City updated successfully', 'success')
