@@ -28,8 +28,8 @@ class VotingTestCase(unittest.TestCase):
             'userUuid': 'test-user-uuid',
             'crossingNodeId': 'test-crossing-id',
             'vote': 1,  # OK
-            'city': 'Test City',
-            'version': 1
+            'city_id': 1,  # Test city ID
+            'version_id': 1  # Test version ID
         })
         self.assertEqual(response.status_code, 200)
         data = response.get_json()

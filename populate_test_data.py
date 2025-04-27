@@ -69,14 +69,22 @@ def initialize_user(user_uuid: str) -> None:
         print(f"Response: {response.text}")
         sys.exit(1)
 
-def cast_vote(user_uuid: str, crossing_id: str, vote: int) -> None:
+def cast_vote(user_uuid: str, crossing_id: str, vote: int, city_id: int = None, version_id: int = None) -> None:
     """Cast a vote via the API."""
     try:
-        response = requests.post(f'{BASE_URL}/api/vote', json={
+        vote_data = {
             'userUuid': user_uuid,
             'crossingNodeId': crossing_id,
             'vote': vote
-        })
+        }
+        
+        # Add city_id and version_id if provided
+        if city_id is not None:
+            vote_data['city_id'] = city_id
+        if version_id is not None:
+            vote_data['version_id'] = version_id
+            
+        response = requests.post(f'{BASE_URL}/api/vote', json=vote_data)
         response.raise_for_status()
         return True
     except requests.exceptions.HTTPError as e:

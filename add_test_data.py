@@ -59,7 +59,9 @@ def add_test_data():
             vote_data = {
                 "userUuid": user_uuid,
                 "crossingNodeId": crossing_id,
-                "vote": vote_value
+                "vote": vote_value,
+                "city_id": crossing['city_id'],
+                "version_id": crossing['version_id']
             }
             
             # Cast vote

@@ -109,7 +109,9 @@ class TestAPI(unittest.TestCase):
         response = self.client.post('/api/vote', json={
             'userUuid': self.user_uuid,
             'crossingNodeId': 'node/123456789',
-            'vote': 1
+            'vote': 1,
+            'city_id': self.city.id,
+            'version_id': self.version.id
         })
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
@@ -124,7 +126,9 @@ class TestAPI(unittest.TestCase):
         response = self.client.post('/api/vote', json={
             'userUuid': self.user_uuid,
             'crossingNodeId': 'node/123456789',
-            'vote': 2
+            'vote': 2,
+            'city_id': self.city.id,
+            'version_id': self.version.id
         })
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)

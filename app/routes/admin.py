@@ -29,12 +29,13 @@ def manage_cities():
     if request.method == 'POST':
         name = request.form.get('name')
         description = request.form.get('description')
+        information_text = request.form.get('information_text', '')
         
         if not name:
             flash('City name is required', 'error')
             return redirect(url_for('admin.manage_cities'))
             
-        city = City(name=name, description=description)
+        city = City(name=name, description=description, information_text=information_text)
         db.session.add(city)
         db.session.commit()
         flash('City added successfully', 'success')
@@ -42,6 +43,31 @@ def manage_cities():
         
     cities = City.query.all()
     return render_template('admin/cities.html', cities=cities)
+
+@admin_bp.route('/cities/<int:city_id>/edit', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def edit_city(city_id):
+    city = City.query.get_or_404(city_id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name')
+        description = request.form.get('description')
+        information_text = request.form.get('information_text', '')
+        
+        if not name:
+            flash('City name is required', 'error')
+            return redirect(url_for('admin.edit_city', city_id=city_id))
+        
+        city.name = name
+        city.description = description
+        city.information_text = information_text
+        db.session.commit()
+        
+        flash('City updated successfully', 'success')
+        return redirect(url_for('admin.manage_cities'))
+    
+    return render_template('admin/edit_city.html', city=city)
 
 @admin_bp.route('/cities/<int:city_id>/delete', methods=['POST'])
 @login_required

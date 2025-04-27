@@ -35,19 +35,14 @@
                     {% endif %}
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-warning toggle-active" 
-                            data-city-id="{{ city.id }}"
-                            data-is-active="{{ city.is_active }}">
-                        {% if city.is_active %}Deactivate{% else %}Activate{% endif %}
+                    <a href="{{ url_for('admin.manage_versions', city_id=city.id) }}" class="btn btn-sm btn-outline-primary">Versions</a>
+                    <a href="{{ url_for('admin.edit_city', city_id=city.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <button class="btn btn-sm btn-outline-success toggle-status" data-city-id="{{ city.id }}" data-status="{{ 'active' if city.is_active else 'inactive' }}">
+                        {{ 'Deactivate' if city.is_active else 'Activate' }}
                     </button>
-                    <a href="{{ url_for('admin.manage_versions', city_id=city.id) }}" class="btn btn-sm btn-info">
-                        Manage Versions
-                    </a>
-                    <button class="btn btn-sm btn-danger" 
-                            onclick="deleteCity({{ city.id }})"
-                            {% if city.crossings %}disabled title="Cannot delete city with crossings"{% endif %}>
-                        Delete
-                    </button>
+                    <form method="POST" action="{{ url_for('admin.delete_city', city_id=city.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this city?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
@@ -73,6 +68,10 @@
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                     </div>
+                    <div class="mb-3">
+                        <label for="information_text" class="form-label">Information Text (HTML)</label>
+                        <textarea class="form-control" id="information_text" name="information_text" rows="5"></textarea>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -87,40 +86,26 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Toggle city active status
-    document.querySelectorAll('.toggle-active').forEach(button => {
+    const toggleButtons = document.querySelectorAll('.toggle-status');
+    
+    toggleButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const cityId = this.dataset.cityId;
+            const cityId = this.getAttribute('data-city-id');
+            
             fetch(`/admin/cities/${cityId}/toggle_active`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload();
+                    window.location.reload();
                 }
             });
         });
     });
 });
-
-function deleteCity(cityId) {
-    if (confirm('Are you sure you want to delete this city? This will also delete all its versions.')) {
-        fetch(`/admin/cities/${cityId}/delete`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                location.reload();
-            }
-        });
-    }
-}
 </script>
 {% endblock %} 

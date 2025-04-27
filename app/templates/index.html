@@ -181,7 +181,7 @@
                 }
             });
 
-            // Add crossings to map
+            // Add crossings to map with data attributes for city_id and version_id
             crossings.forEach(crossing => {
                 const marker = L.marker([crossing.lat, crossing.lon]).addTo(map);
                 marker.bindPopup(`
@@ -190,7 +190,7 @@
                     <p>Version: ${crossing.version}</p>
                     <p>Votes: ${crossing.votes_total}</p>
                     <p>Status: ${getStatusText(crossing.current_result)}</p>
-                    <button class="btn btn-primary" onclick="voteForCrossing('${crossing.id}')">Vote</button>
+                    <button class="btn btn-primary" onclick="voteForCrossing('${crossing.id}', ${crossing.city_id}, ${crossing.version_id})">Vote</button>
                 `);
             });
         }
@@ -205,9 +205,13 @@
             }
         }
 
-        async function voteForCrossing(crossingId) {
+        async function voteForCrossing(crossingId, cityId, versionId) {
             const userUuid = localStorage.getItem('userUuid') || crypto.randomUUID();
             localStorage.setItem('userUuid', userUuid);
+            
+            // Store city and version information for voting
+            localStorage.setItem('currentCrossingCityId', cityId);
+            localStorage.setItem('currentCrossingVersionId', versionId);
 
             // Initialize user if needed
             await fetch('/api/initialize-user', {
@@ -231,6 +235,10 @@
 
         async function submitVote(crossingId, vote) {
             const userUuid = localStorage.getItem('userUuid');
+            // Get the stored city and version IDs
+            const cityId = localStorage.getItem('currentCrossingCityId');
+            const versionId = localStorage.getItem('currentCrossingVersionId');
+            
             const response = await fetch('/api/vote', {
                 method: 'POST',
                 headers: {
@@ -239,7 +247,9 @@
                 body: JSON.stringify({
                     userUuid,
                     crossingNodeId: crossingId,
-                    vote
+                    vote,
+                    city_id: cityId,
+                    version_id: versionId
                 })
             });
 

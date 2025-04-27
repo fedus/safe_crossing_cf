@@ -1,0 +1,48 @@
+{% extends 'admin/base.html' %}
+
+{% block head %}
+{{ super() }}
+<!-- Include TinyMCE -->
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+  tinymce.init({
+    selector: '#information_text',
+    plugins: 'anchor autolink charmap codesample emoticons image link lists media searchreplace table visualblocks wordcount',
+    toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | numlist bullist indent outdent | emoticons charmap | removeformat',
+    height: 400
+  });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Edit City: {{ city.name }}</h2>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>Edit City Details</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                <div class="mb-3">
+                    <label for="name" class="form-label">City Name</label>
+                    <input type="text" class="form-control" id="name" name="name" value="{{ city.name }}" required>
+                </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3">{{ city.description or "" }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="information_text" class="form-label">Information Text (HTML)</label>
+                    <textarea class="form-control" id="information_text" name="information_text" rows="10">{{ city.information_text or "" }}</textarea>
+                    <small class="text-muted">This content can include HTML and will be displayed to users in the app.</small>
+                </div>
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Update City</button>
+                    <a href="{{ url_for('admin.manage_cities') }}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

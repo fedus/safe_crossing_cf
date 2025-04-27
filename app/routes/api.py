@@ -35,6 +35,8 @@ def vote():
     user_uuid = data.get('userUuid')
     crossing_node_id = data.get('crossingNodeId')
     vote_value = data.get('vote')
+    city_id = data.get('city_id')
+    version_id = data.get('version_id')
     
     if not all([user_uuid, crossing_node_id, vote_value is not None]):
         return jsonify({'error': 'Missing required parameters'}), 400
@@ -46,7 +48,17 @@ def vote():
         db.session.add(meta)
     
     # Get crossing
-    crossing = Crossing.query.get(crossing_node_id)
+    if city_id and version_id:
+        # If city_id and version_id are provided, use them for a more specific query
+        crossing = Crossing.query.filter_by(
+            id=crossing_node_id,
+            city_id=city_id,
+            version_id=version_id
+        ).first()
+    else:
+        # Fallback to original behavior for backward compatibility
+        crossing = Crossing.query.get(crossing_node_id)
+    
     if not crossing:
         return jsonify({'error': 'Crossing not found'}), 404
     
@@ -175,18 +187,41 @@ def get_user_votes(user_uuid):
 @bp.route('/cities', methods=['GET'])
 def get_cities():
     cities = City.query.filter_by(is_active=True).all()
+    result = []
+    
+    for city in cities:
+        # Find the active version for this city
+        active_version = CityVersion.query.filter_by(city_id=city.id, is_active=True).first()
+        current_version = str(active_version.id) if active_version else ""
+        
+        result.append({
+            'id': city.id,
+            'name': city.name,
+            'informationText': city.information_text or "",
+            'currentVersion': current_version
+        })
+    
+    return jsonify(result)
+
+@bp.route('/cities/active', methods=['GET'])
+def get_active_cities():
+    """Returns a list of active cities in a simpler format as documented in the README."""
+    cities = City.query.filter_by(is_active=True).all()
     return jsonify([{
         'id': city.id,
         'name': city.name,
-        'description': city.description,
-        'versions': [{
-            'id': version.id,
-            'version_number': version.version_number,
-            'description': version.description,
-            'is_active': version.is_active,
-            'is_completed': version.is_completed
-        } for version in city.versions if version.is_active]
+        'is_active': city.is_active
     } for city in cities])
+
+@bp.route('/versions/active', methods=['GET'])
+def get_active_versions():
+    """Returns a list of active versions as documented in the README."""
+    versions = CityVersion.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': version.id,
+        'name': f"Version {version.version_number}",
+        'is_active': version.is_active
+    } for version in versions])
 
 @bp.route('/cities/<int:city_id>/versions/<int:version_id>/crossings', methods=['GET'])
 def get_city_version_crossings(city_id, version_id):
