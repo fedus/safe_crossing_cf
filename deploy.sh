@@ -3,8 +3,10 @@ set -e
 
 echo "Starting deployment process..."
 
-# Pull latest changes
-git pull origin main
+# Pull latest changes from the development branch
+git fetch origin
+git checkout flask-docker-production
+git pull origin flask-docker-production
 
 # Activate virtual environment or create if doesn't exist
 if [ ! -d "venv" ]; then
