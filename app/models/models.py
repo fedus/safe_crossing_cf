@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
     total_votes_cast = db.Column(db.Integer, default=0)
     is_admin = db.Column(db.Boolean, default=False)  # New field for admin status
     password_hash = db.Column(db.String(128))
+    fcm_token = db.Column(db.String(255), nullable=True)  # New field for FCM token
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):

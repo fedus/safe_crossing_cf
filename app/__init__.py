@@ -24,6 +24,14 @@ def create_app(config_name=None):
     else:
         app.config.from_object('config.DevelopmentConfig')
     
+    # Force absolute path for SQLite database
+    if 'sqlite' in app.config['SQLALCHEMY_DATABASE_URI']:
+        # Get current working directory
+        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        db_path = os.path.join(base_dir, 'instance', 'safe_crossing.db')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{db_path}"
+        print(f"Using database at: {db_path}")
+    
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
