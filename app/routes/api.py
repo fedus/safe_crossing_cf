@@ -3,6 +3,7 @@ from app import db
 from app.models.models import User, Crossing, Vote, Meta, City, CityVersion
 from sqlalchemy import func
 import uuid
+import random
 
 bp = Blueprint('api', __name__)
 
@@ -338,6 +339,9 @@ def get_unvoted_crossings(city_id, version_id):
     unvoted_crossings = [
         c for c in all_crossings if c.id not in voted_crossing_ids
     ]
+    
+    # Randomize the order of unvoted crossings
+    random.shuffle(unvoted_crossings)
     
     return jsonify([{
         'id': c.id,
