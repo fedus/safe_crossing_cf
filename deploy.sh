@@ -3,32 +3,23 @@ set -e
 
 echo "Starting deployment process..."
 
-# Pull latest changes from the feature branch
+# Pull latest changes from the development branch
 git fetch origin
-git checkout feature/city-completion-v2
-git pull origin feature/city-completion-v2
+git checkout flask-docker-production
+git pull origin flask-docker-production
 
-# Activate virtual environment or create if doesn't exist
-if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
-fi
-source venv/bin/activate
-
-# Install/update dependencies
-echo "Installing dependencies..."
-pip install -r requirements.txt
+# Build and restart the Docker containers
+echo "Building and restarting Docker containers..."
+docker compose down
+docker compose build
+docker compose up -d
 
 # Run database migrations
 echo "Running database migrations..."
-flask db upgrade
-
-# Restart the Gunicorn service
-echo "Restarting Gunicorn service..."
-sudo systemctl restart safe_crossing
+docker compose exec web flask db upgrade
 
 echo "Deployment completed successfully!"
 
-# Follow the logs
-echo "Following service logs..."
-sudo journalctl -u safe_crossing -f 
+# Show the logs
+echo "Showing container logs..."
+docker compose logs -f 
