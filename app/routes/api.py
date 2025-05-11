@@ -399,8 +399,19 @@ def get_city_completion(city_id):
         Crossing.version_id == active_version.id
     ).first()
     
+    if not result:
+        return jsonify({
+            'city_id': city_id,
+            'version_id': active_version.id,
+            'total_crossings': 0,
+            'total_votes': 0,
+            'votes_limit': votes_limit,
+            'crossings_with_enough_votes': 0,
+            'completion_percentage': 0
+        })
+    
     total_votes = result.total_votes or 0  # Handle None value
-    crossings_with_enough_votes = result.crossings_with_enough_votes
+    crossings_with_enough_votes = result.crossings_with_enough_votes or 0  # Handle None value
     
     # Calculate completion percentage
     completion_percentage = 0

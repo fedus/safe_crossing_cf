@@ -3,16 +3,16 @@ Description=Safe Crossing Flask Application
 After=network.target
 
 [Service]
-User=your_username
+User=thorben
 Group=www-data
-WorkingDirectory=/path/to/safe_crossing_cf
-Environment="PATH=/path/to/safe_crossing_cf/venv/bin"
+WorkingDirectory=/var/www/safecrossingcf2
+Environment="PATH=/var/www/safecrossingcf2/venv/bin"
 Environment="FLASK_APP=run.py"
 Environment="FLASK_ENV=production"
 Environment="FLASK_DEBUG=false"
 Environment="SECRET_KEY=your-secret-key-here"
-Environment="DATABASE_URL=sqlite:////path/to/safe_crossing_cf/instance/safe_crossing.db"
-ExecStart=/path/to/safe_crossing_cf/venv/bin/gunicorn --workers 4 --bind 127.0.0.1:5001 --timeout 120 run:app
+Environment="DATABASE_URL=sqlite:////var/www/safecrossingcf2/instance/safe_crossing.db"
+ExecStart=/var/www/safecrossingcf2/venv/bin/gunicorn --workers 4 --bind 127.0.0.1:5420 --timeout 120 run:app
 Restart=always
 
 [Install]
