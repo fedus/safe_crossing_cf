@@ -1,6 +1,6 @@
 import unittest
 from app import create_app, db
-from app.models.models import User, City, CityVersion, Crossing, Vote, Meta
+from app.models.models import User, City, CityVersion, Crossing, Vote
 import json
 import uuid
 
@@ -68,8 +68,8 @@ class TestAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]['name'], 'Test City')
-        self.assertEqual(len(data[0]['versions']), 1)
-        self.assertEqual(data[0]['versions'][0]['version_number'], 1)
+        self.assertIn('currentVersion', data[0])
+        self.assertIn('completion', data[0])
 
     def test_get_city_version_crossings(self):
         response = self.client.get(f'/api/cities/{self.city.id}/versions/{self.version.id}/crossings')
@@ -117,16 +117,16 @@ class TestAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data['status'], 'VOTE_RECORDED')
         
-        # Verify vote was recorded
-        crossing = Crossing.query.get('node/123456789')
-        self.assertEqual(crossing.votes_ok, 1)
-        self.assertEqual(crossing.votes_total, 1)
+        # Verify vote was recorded by checking Vote table
+        votes = Vote.query.filter_by(crossing_id='node/123456789').all()
+        self.assertEqual(len(votes), 1)
+        self.assertEqual(votes[0].vote, 1)  # 1 = okay
         
-        # Test updating vote
+        # Test adding another vote (not_okay)
         response = self.client.post('/api/vote', json={
             'userUuid': self.user_uuid,
             'crossingNodeId': 'node/123456789',
-            'vote': 2,
+            'vote': -1,  # -1 = not_okay
             'city_id': self.city.id,
             'version_id': self.version.id
         })
@@ -134,11 +134,12 @@ class TestAPI(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data['status'], 'VOTE_RECORDED')
         
-        # Verify vote was updated
-        crossing = Crossing.query.get('node/123456789')
-        self.assertEqual(crossing.votes_ok, 0)
-        self.assertEqual(crossing.votes_too_close, 1)
-        self.assertEqual(crossing.votes_total, 1)
+        # Verify new vote was added (no update, just new vote)
+        votes = Vote.query.filter_by(crossing_id='node/123456789').all()
+        self.assertEqual(len(votes), 2)  # Two separate votes now
+        vote_values = [v.vote for v in votes]
+        self.assertIn(1, vote_values)  # Original okay vote
+        self.assertIn(-1, vote_values)  # New not_okay vote
 
     def test_get_user_votes(self):
         # Add a vote

@@ -35,10 +35,11 @@
                 <td>{{ crossing.street }}</td>
                 <td>{{ crossing.lat }}, {{ crossing.lon }}</td>
                 <td>
-                    <span class="badge bg-success">{{ crossing.votes_ok }}</span>
-                    <span class="badge bg-danger">{{ crossing.votes_too_close }}</span>
-                    <span class="badge bg-warning">{{ crossing.votes_not_sure }}</span>
-                    <span class="badge bg-info">{{ crossing.votes_total }}</span>
+                    {% set counts = counts_by_crossing.get(crossing.id, {'okay':0,'not_okay':0,'dont_know':0,'total':0}) %}
+                    <span class="badge bg-success">{{ counts.okay }}</span>
+                    <span class="badge bg-danger">{{ counts.not_okay }}</span>
+                    <span class="badge bg-warning">{{ counts.dont_know }}</span>
+                    <span class="badge bg-info">{{ counts.total }}</span>
                 </td>
                 <td>
                     <button class="btn btn-sm btn-warning" onclick="editCrossing('{{ crossing.id }}')">

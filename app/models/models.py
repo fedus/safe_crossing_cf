@@ -56,11 +56,6 @@ class Crossing(db.Model):
     lon = db.Column(db.Float, nullable=False)
     neighbourhood = db.Column(db.String(100), nullable=True)
     street = db.Column(db.String(100), nullable=True)
-    votes_not_sure = db.Column(db.Integer, default=0)
-    votes_ok = db.Column(db.Integer, default=0)
-    votes_too_close = db.Column(db.Integer, default=0)
-    votes_total = db.Column(db.Integer, default=0)
-    current_result = db.Column(db.Integer, default=0)  # 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE, 3: TIE
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -73,17 +68,10 @@ class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
     crossing_id = db.Column(db.String(36), db.ForeignKey('crossing.id'), nullable=False)
-    vote = db.Column(db.Integer, nullable=False)  # 0: CANT_SAY, 1: OK, 2: PARKING_CLOSE
+    vote = db.Column(db.Integer, nullable=False)  # -1: NOT_OKAY, 0: DONT_KNOW, 1: OKAY
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    __table_args__ = (db.UniqueConstraint('user_id', 'crossing_id'),)
+    # Allow multiple votes from the same user for the same crossing; no uniqueness constraint
 
-class Meta(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    crossings_with_enough_votes = db.Column(db.Integer, default=0)
-    votes_not_sure = db.Column(db.Integer, default=0)
-    votes_ok = db.Column(db.Integer, default=0)
-    votes_too_close = db.Column(db.Integer, default=0)
-    votes_tie = db.Column(db.Integer, default=0)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow) 
+    

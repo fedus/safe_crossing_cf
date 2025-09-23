@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app import db
-from app.models.models import User, Crossing, Vote, Meta, City, CityVersion
+from app.models.models import User, Crossing, Vote, City, CityVersion
 from sqlalchemy import func
 import uuid
 import random
@@ -39,125 +39,106 @@ def vote():
     city_id = data.get('city_id')
     version_id = data.get('version_id')
     
-    if not all([user_uuid, crossing_node_id, vote_value is not None]):
+    # Explicit validation to allow vote_value == 0
+    if user_uuid is None or crossing_node_id is None or vote_value is None:
         return jsonify({'error': 'Missing required parameters'}), 400
     
-    # Get or create meta record
-    meta = Meta.query.first()
-    if not meta:
-        meta = Meta()
-        db.session.add(meta)
+    # Validate vote value mapping: -1 = not_okay, 0 = dont_know, 1 = okay
+    if vote_value not in (-1, 0, 1):
+        return jsonify({'error': 'Invalid vote value'}), 400
     
-    # Get crossing
-    if city_id and version_id:
-        # If city_id and version_id are provided, use them for a more specific query
-        crossing = Crossing.query.filter_by(
-            id=crossing_node_id,
-            city_id=city_id,
-            version_id=version_id
-        ).first()
-    else:
-        # Fallback to original behavior for backward compatibility
-        crossing = Crossing.query.get(crossing_node_id)
+    # Resolve crossing strictly by id; optionally check city/version if provided
+    crossing_query = Crossing.query.filter_by(id=crossing_node_id)
+    if city_id is not None:
+        crossing_query = crossing_query.filter_by(city_id=city_id)
+    if version_id is not None:
+        crossing_query = crossing_query.filter_by(version_id=version_id)
+    crossing = crossing_query.first()
     
     if not crossing:
         return jsonify({'error': 'Crossing not found'}), 404
     
-    # Get existing vote if any
-    existing_vote = Vote.query.filter_by(
+    # Ensure user exists
+    user = User.query.get(user_uuid)
+    if not user:
+        user = User(id=user_uuid, initialized=True)
+        db.session.add(user)
+    
+    # Always insert a new vote (no upsert)
+    new_vote = Vote(
         user_id=user_uuid,
-        crossing_id=crossing_node_id
+        crossing_id=crossing_node_id,
+        vote=vote_value
+    )
+    db.session.add(new_vote)
+    db.session.commit()
+    
+    # Live aggregation of counts for this crossing
+    from sqlalchemy import case
+    counts = db.session.query(
+        func.sum(case((Vote.vote == -1, 1), else_=0)).label('not_okay'),
+        func.sum(case((Vote.vote == 0, 1), else_=0)).label('dont_know'),
+        func.sum(case((Vote.vote == 1, 1), else_=0)).label('okay'),
+        func.count(Vote.id).label('total')
+    ).filter(
+        Vote.crossing_id == crossing_node_id
     ).first()
     
-    # Calculate new result
-    votes = {
-        'not_sure': crossing.votes_not_sure,
-        'ok': crossing.votes_ok,
-        'too_close': crossing.votes_too_close
-    }
+    # Determine result in legacy scale: 0=cant_say, 1=ok, 2=too_close, 3=tie
+    count_not_okay = counts.not_okay or 0
+    count_dont_know = counts.dont_know or 0
+    count_okay = counts.okay or 0
+    max_count = max(count_not_okay, count_dont_know, count_okay)
+    winners = [k for k, v in {
+        'dont_know': count_dont_know,
+        'okay': count_okay,
+        'not_okay': count_not_okay
+    }.items() if v == max_count]
     
-    if existing_vote:
-        # Remove old vote
-        votes[vote_enum_to_string(existing_vote.vote)] -= 1
-    else:
-        # New vote
-        crossing.votes_total += 1
-        user = User.query.get(user_uuid)
-        user.total_votes_cast += 1
-    
-    # Add new vote
-    votes[vote_enum_to_string(vote_value)] += 1
-    
-    # Update crossing votes
-    crossing.votes_not_sure = votes['not_sure']
-    crossing.votes_ok = votes['ok']
-    crossing.votes_too_close = votes['too_close']
-    
-    # Calculate new result
-    max_votes = max(votes.values())
-    if votes['not_sure'] == max_votes:
-        new_result = 0
-    elif votes['ok'] == max_votes:
-        new_result = 1
-    elif votes['too_close'] == max_votes:
-        new_result = 2
-    else:
+    if len(winners) > 1:
         new_result = 3
-    
-    # Update meta if crossing just reached 5 votes
-    if crossing.votes_total == 5:
-        meta.crossings_with_enough_votes += 1
-        setattr(meta, f'votes_{vote_enum_to_string(new_result)}', 
-                getattr(meta, f'votes_{vote_enum_to_string(new_result)}') + 1)
-    elif crossing.votes_total > 5 and new_result != crossing.current_result:
-        # Update meta for changed results
-        setattr(meta, f'votes_{vote_enum_to_string(crossing.current_result)}',
-                getattr(meta, f'votes_{vote_enum_to_string(crossing.current_result)}') - 1)
-        setattr(meta, f'votes_{vote_enum_to_string(new_result)}',
-                getattr(meta, f'votes_{vote_enum_to_string(new_result)}') + 1)
-    
-    crossing.current_result = new_result
-    
-    # Create or update vote
-    if existing_vote:
-        existing_vote.vote = vote_value
     else:
-        new_vote = Vote(
-            user_id=user_uuid,
-            crossing_id=crossing_node_id,
-            vote=vote_value
-        )
-        db.session.add(new_vote)
-    
-    db.session.commit()
+        winner = winners[0]
+        if winner == 'dont_know':
+            new_result = 0
+        elif winner == 'okay':
+            new_result = 1
+        else:
+            new_result = 2
     
     return jsonify({
         'status': 'VOTE_RECORDED',
-        'new_result': new_result
+        'new_result': new_result,
+        'counts': {
+            'not_okay': count_not_okay,
+            'dont_know': count_dont_know,
+            'okay': count_okay,
+            'total': counts.total or 0
+        }
     })
 
 def vote_enum_to_string(vote):
-    if vote == 0:
-        return 'not_sure'
+    # Updated mapping for readability in potential responses
+    if vote == -1:
+        return 'not_okay'
+    elif vote == 0:
+        return 'dont_know'
     elif vote == 1:
-        return 'ok'
-    elif vote == 2:
-        return 'too_close'
+        return 'okay'
     else:
-        return 'tie'
+        return 'unknown'
 
 @bp.route('/crossings', methods=['GET'])
 def get_crossings():
     crossings = Crossing.query.all()
     return jsonify([{
         'id': c.id,
-        'city': c.city,
-        'version': c.version,
-        'votes_not_sure': c.votes_not_sure,
-        'votes_ok': c.votes_ok,
-        'votes_too_close': c.votes_too_close,
-        'votes_total': c.votes_total,
-        'current_result': c.current_result
+        'city_id': c.city_id,
+        'version_id': c.version_id,
+        'lat': c.lat,
+        'lon': c.lon,
+        'neighbourhood': c.neighbourhood,
+        'street': c.street
     } for c in crossings])
 
 @bp.route('/crossings/<crossing_id>', methods=['GET'])
@@ -167,13 +148,12 @@ def get_crossing(crossing_id):
         return jsonify({'error': 'Crossing not found'}), 404
     return jsonify({
         'id': crossing.id,
-        'city': crossing.city,
-        'version': crossing.version,
-        'votes_not_sure': crossing.votes_not_sure,
-        'votes_ok': crossing.votes_ok,
-        'votes_too_close': crossing.votes_too_close,
-        'votes_total': crossing.votes_total,
-        'current_result': crossing.current_result
+        'city_id': crossing.city_id,
+        'version_id': crossing.version_id,
+        'lat': crossing.lat,
+        'lon': crossing.lon,
+        'neighbourhood': crossing.neighbourhood,
+        'street': crossing.street
     })
 
 @bp.route('/votes/<user_uuid>', methods=['GET'])
@@ -219,28 +199,39 @@ def get_cities():
     # Create mapping of city_id to crossing count
     city_to_crossing_count = {city_id: count for city_id, count in crossing_counts}
     
-    # Get sum of votes per city/version
+    # Get sum of votes per city/version using live Vote rows
+    from sqlalchemy.orm import aliased
+    Cv = aliased(Crossing)
     vote_counts = db.session.query(
-        Crossing.city_id,
-        func.sum(Crossing.votes_total).label('total_votes')
-    ).filter(
-        Crossing.city_id.in_(city_ids_with_versions),
-        Crossing.version_id.in_(version_ids)
-    ).group_by(Crossing.city_id).all()
+        Cv.city_id,
+        func.count(Vote.id).label('total_votes')
+    ).join(Vote, Vote.crossing_id == Cv.id)
+    vote_counts = vote_counts.filter(
+        Cv.city_id.in_(city_ids_with_versions),
+        Cv.version_id.in_(version_ids)
+    ).group_by(Cv.city_id).all()
     
     # Create mapping of city_id to vote count
     city_to_vote_count = {city_id: count for city_id, count in vote_counts}
     
-    # Get count of crossings with enough votes per city/version
+    # Get count of crossings with enough votes per city/version using Vote aggregates
     votes_limit = 5
-    enough_votes_counts = db.session.query(
-        Crossing.city_id,
-        func.count(Crossing.id).label('crossings_with_enough_votes')
-    ).filter(
+    # Subquery: count votes per crossing
+    votes_per_crossing_subq = db.session.query(
+        Crossing.id.label('crossing_id'),
+        Crossing.city_id.label('city_id'),
+        func.count(Vote.id).label('vote_count')
+    ).join(Vote, Vote.crossing_id == Crossing.id).filter(
         Crossing.city_id.in_(city_ids_with_versions),
-        Crossing.version_id.in_(version_ids),
-        Crossing.votes_total >= votes_limit
-    ).group_by(Crossing.city_id).all()
+        Crossing.version_id.in_(version_ids)
+    ).group_by(Crossing.id).subquery()
+
+    enough_votes_counts = db.session.query(
+        votes_per_crossing_subq.c.city_id,
+        func.count().label('crossings_with_enough_votes')
+    ).filter(
+        votes_per_crossing_subq.c.vote_count >= votes_limit
+    ).group_by(votes_per_crossing_subq.c.city_id).all()
     
     # Create mapping of city_id to enough votes count
     city_to_enough_votes = {city_id: count for city_id, count in enough_votes_counts}
@@ -310,12 +301,7 @@ def get_city_version_crossings(city_id, version_id):
         'lat': c.lat,
         'lon': c.lon,
         'neighbourhood': c.neighbourhood,
-        'street': c.street,
-        'votes_not_sure': c.votes_not_sure,
-        'votes_ok': c.votes_ok,
-        'votes_too_close': c.votes_too_close,
-        'votes_total': c.votes_total,
-        'current_result': c.current_result
+        'street': c.street
     } for c in crossings])
 
 @bp.route('/cities/<int:city_id>/versions/<int:version_id>/unvoted', methods=['GET'])
@@ -330,30 +316,23 @@ def get_unvoted_crossings(city_id, version_id):
         version_id=version_id
     ).all()
     
-    # Get user's votes for these crossings
+    # Get user's voted crossing ids once
     voted_crossing_ids = set(
-        v.crossing_id for v in Vote.query.filter_by(user_id=user_uuid).all()
+        v.crossing_id for v in Vote.query.with_entities(Vote.crossing_id).filter_by(user_id=user_uuid).all()
     )
-    
+
     # Filter out voted crossings
-    unvoted_crossings = [
-        c for c in all_crossings if c.id not in voted_crossing_ids
-    ]
-    
+    unvoted_crossings = [c for c in all_crossings if c.id not in voted_crossing_ids]
+
     # Randomize the order of unvoted crossings
     random.shuffle(unvoted_crossings)
-    
+
     return jsonify([{
         'id': c.id,
         'lat': c.lat,
         'lon': c.lon,
         'neighbourhood': c.neighbourhood,
-        'street': c.street,
-        'votes_not_sure': c.votes_not_sure,
-        'votes_ok': c.votes_ok,
-        'votes_too_close': c.votes_too_close,
-        'votes_total': c.votes_total,
-        'current_result': c.current_result
+        'street': c.street
     } for c in unvoted_crossings])
 
 @bp.route('/users/link-fcm-token', methods=['POST'])
@@ -391,31 +370,29 @@ def get_city_completion(city_id):
         version_id=active_version.id
     ).count()
     
-    # Get total votes sum and count of crossings with enough votes
+    # Get total votes sum and count of crossings with enough votes using live Vote rows
     votes_limit = 5
-    
-    # Using a query to get total votes and crossings with enough votes
-    result = db.session.query(
-        func.sum(Crossing.votes_total).label('total_votes'),
-        func.count(Crossing.id).filter(Crossing.votes_total >= votes_limit).label('crossings_with_enough_votes')
+
+    # Total votes for this city/version
+    total_votes = db.session.query(func.count(Vote.id)).join(
+        Crossing, Vote.crossing_id == Crossing.id
     ).filter(
         Crossing.city_id == city_id,
         Crossing.version_id == active_version.id
-    ).first()
-    
-    if not result:
-        return jsonify({
-            'city_id': city_id,
-            'version_id': active_version.id,
-            'total_crossings': 0,
-            'total_votes': 0,
-            'votes_limit': votes_limit,
-            'crossings_with_enough_votes': 0,
-            'completion_percentage': 0
-        })
-    
-    total_votes = result.total_votes or 0  # Handle None value
-    crossings_with_enough_votes = result.crossings_with_enough_votes or 0  # Handle None value
+    ).scalar() or 0
+
+    # Count of crossings with enough votes (>= votes_limit)
+    votes_per_crossing_subq = db.session.query(
+        Crossing.id.label('crossing_id'),
+        func.count(Vote.id).label('vote_count')
+    ).join(Vote, Vote.crossing_id == Crossing.id).filter(
+        Crossing.city_id == city_id,
+        Crossing.version_id == active_version.id
+    ).group_by(Crossing.id).subquery()
+
+    crossings_with_enough_votes = db.session.query(func.count()).filter(
+        votes_per_crossing_subq.c.vote_count >= votes_limit
+    ).scalar() or 0
     
     # Calculate completion percentage
     completion_percentage = 0

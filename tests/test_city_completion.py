@@ -94,16 +94,7 @@ class CityCompletionTestCase(unittest.TestCase):
             )
             db.session.add(vote)
             
-            # Update crossing vote counts
-            crossing = Crossing.query.get(crossing_id)
-            crossing.votes_total += 1
-            
-            if vote_type == 0:
-                crossing.votes_not_sure += 1
-            elif vote_type == 1:
-                crossing.votes_ok += 1
-            elif vote_type == 2:
-                crossing.votes_too_close += 1
+            # No per-crossing counters anymore; aggregation is live from Vote rows
 
     def tearDown(self):
         # Clean up the database

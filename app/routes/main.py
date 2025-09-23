@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, redirect, url_fo
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
-from app.models.models import Crossing, Meta, User, City, CityVersion, Vote
+from app.models.models import Crossing, User, City, CityVersion, Vote
 from datetime import datetime, timedelta
 
 bp = Blueprint('main', __name__)
@@ -15,14 +15,44 @@ def index():
     last_24h = datetime.utcnow() - timedelta(hours=24)
     recent_votes = Vote.query.filter(Vote.created_at >= last_24h).count()
     
-    # Get statistics
-    meta = Meta.query.first()
+    # Live statistics from Vote rows
+    from sqlalchemy import func, case
+    # Count crossings with enough votes across active versions
+    active_version_ids = []
+    for city in cities:
+        av = CityVersion.query.filter_by(city_id=city.id, is_active=True).first()
+        if av:
+            active_version_ids.append(av.id)
+
+    votes_limit = 5
+
+    # Crossings with enough votes
+    crossings_with_enough_votes = 0
+    if active_version_ids:
+        votes_per_crossing_subq = db.session.query(
+            Crossing.id.label('crossing_id'),
+            func.count(Vote.id).label('vote_count')
+        ).join(Vote, Vote.crossing_id == Crossing.id).filter(
+            Crossing.version_id.in_(active_version_ids)
+        ).group_by(Crossing.id).subquery()
+
+        crossings_with_enough_votes = db.session.query(func.count()).filter(
+            votes_per_crossing_subq.c.vote_count >= votes_limit
+        ).scalar() or 0
+
+    # Global distribution of vote categories
+    vote_totals = db.session.query(
+        func.sum(case((Vote.vote == 1, 1), else_=0)).label('votes_ok'),
+        func.sum(case((Vote.vote == -1, 1), else_=0)).label('votes_too_close'),
+        func.sum(case((Vote.vote == 0, 1), else_=0)).label('votes_not_sure')
+    ).first()
+
     stats = {
-        'crossings_with_enough_votes': meta.crossings_with_enough_votes if meta else 0,
-        'votes_not_sure': meta.votes_not_sure if meta else 0,
-        'votes_ok': meta.votes_ok if meta else 0,
-        'votes_too_close': meta.votes_too_close if meta else 0,
-        'votes_tie': meta.votes_tie if meta else 0
+        'crossings_with_enough_votes': int(crossings_with_enough_votes),
+        'votes_not_sure': int((vote_totals.votes_not_sure or 0)),
+        'votes_ok': int((vote_totals.votes_ok or 0)),
+        'votes_too_close': int((vote_totals.votes_too_close or 0)),
+        'votes_tie': 0
     }
     
     # Get total active crossings
@@ -97,32 +127,44 @@ def get_crossings():
         'version_id': c.version_id,
         'version': c.version.version_number,
         'lat': c.lat,
-        'lon': c.lon,
-        'votes_not_sure': c.votes_not_sure,
-        'votes_ok': c.votes_ok,
-        'votes_too_close': c.votes_too_close,
-        'votes_total': c.votes_total,
-        'current_result': c.current_result
+        'lon': c.lon
     } for c in crossings])
 
 @bp.route('/stats')
 def get_stats():
-    meta = Meta.query.first()
-    if not meta:
-        return jsonify({
-            'crossings_with_enough_votes': 0,
-            'votes_not_sure': 0,
-            'votes_ok': 0,
-            'votes_too_close': 0,
-            'votes_tie': 0
-        })
-    
+    from sqlalchemy import func, case
+    votes_limit = 5
+
+    # Crossings with enough votes across all active versions
+    active_versions = CityVersion.query.filter_by(is_active=True).all()
+    active_version_ids = [v.id for v in active_versions]
+
+    crossings_with_enough_votes = 0
+    if active_version_ids:
+        votes_per_crossing_subq = db.session.query(
+            Crossing.id.label('crossing_id'),
+            func.count(Vote.id).label('vote_count')
+        ).join(Vote, Vote.crossing_id == Crossing.id).filter(
+            Crossing.version_id.in_(active_version_ids)
+        ).group_by(Crossing.id).subquery()
+
+        crossings_with_enough_votes = db.session.query(func.count()).filter(
+            votes_per_crossing_subq.c.vote_count >= votes_limit
+        ).scalar() or 0
+
+    # Global distribution of vote categories
+    totals = db.session.query(
+        func.sum(case((Vote.vote == 1, 1), else_=0)).label('votes_ok'),
+        func.sum(case((Vote.vote == -1, 1), else_=0)).label('votes_too_close'),
+        func.sum(case((Vote.vote == 0, 1), else_=0)).label('votes_not_sure')
+    ).first()
+
     return jsonify({
-        'crossings_with_enough_votes': meta.crossings_with_enough_votes,
-        'votes_not_sure': meta.votes_not_sure,
-        'votes_ok': meta.votes_ok,
-        'votes_too_close': meta.votes_too_close,
-        'votes_tie': meta.votes_tie
+        'crossings_with_enough_votes': int(crossings_with_enough_votes),
+        'votes_not_sure': int((totals.votes_not_sure or 0)),
+        'votes_ok': int((totals.votes_ok or 0)),
+        'votes_too_close': int((totals.votes_too_close or 0)),
+        'votes_tie': 0
     })
 
 @bp.route('/health')

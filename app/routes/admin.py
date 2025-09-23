@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.models.models import City, CityVersion, Crossing, db
+from app.models.models import City, CityVersion, Crossing, Vote, db
 from functools import wraps
 import json
 
@@ -185,7 +185,27 @@ def manage_crossings(city_id, version_id):
     city = City.query.get_or_404(city_id)
     version = CityVersion.query.get_or_404(version_id)
     crossings = Crossing.query.filter_by(city_id=city_id, version_id=version_id).all()
-    return render_template('admin/crossings.html', city=city, version=version, crossings=crossings)
+
+    # Live aggregates per crossing
+    from sqlalchemy import func, case
+    counts_rows = db.session.query(
+        Vote.crossing_id,
+        func.sum(case((Vote.vote == 1, 1), else_=0)).label('okay'),
+        func.sum(case((Vote.vote == -1, 1), else_=0)).label('not_okay'),
+        func.sum(case((Vote.vote == 0, 1), else_=0)).label('dont_know'),
+        func.count(Vote.id).label('total')
+    ).filter(
+        Vote.crossing_id.in_([c.id for c in crossings])
+    ).group_by(Vote.crossing_id).all()
+
+    counts_by_crossing = {row.crossing_id: {
+        'okay': int(row.okay or 0),
+        'not_okay': int(row.not_okay or 0),
+        'dont_know': int(row.dont_know or 0),
+        'total': int(row.total or 0)
+    } for row in counts_rows}
+
+    return render_template('admin/crossings.html', city=city, version=version, crossings=crossings, counts_by_crossing=counts_by_crossing)
 
 @admin_bp.route('/crossings/bulk-import', methods=['POST'])
 @login_required

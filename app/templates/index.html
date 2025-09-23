@@ -86,7 +86,7 @@
                             <div class="col-md-6">
                                 <h5>Vote Results</h5>
                                 <div class="progress" style="height: 30px;">
-                                    {% set total = stats.votes_ok + stats.votes_too_close + stats.votes_not_sure + stats.votes_tie %}
+                                    {% set total = stats.votes_ok + stats.votes_too_close + stats.votes_not_sure %}
                                     {% if total > 0 %}
                                     <div class="progress-bar bg-success" style="width: {{ (stats.votes_ok / total * 100)|int }}%">
                                         {{ stats.votes_ok }} Compliant
@@ -97,9 +97,7 @@
                                     <div class="progress-bar bg-warning" style="width: {{ (stats.votes_not_sure / total * 100)|int }}%">
                                         {{ stats.votes_not_sure }} Not Sure
                                     </div>
-                                    <div class="progress-bar bg-info" style="width: {{ (stats.votes_tie / total * 100)|int }}%">
-                                        {{ stats.votes_tie }} Tied
-                                    </div>
+                                    
                                     {% else %}
                                     <div class="progress-bar" style="width: 100%">No votes yet</div>
                                     {% endif %}
@@ -171,7 +169,7 @@
                 <p>Compliant crossings: ${stats.votes_ok}</p>
                 <p>Non-compliant crossings: ${stats.votes_too_close}</p>
                 <p>Unclear crossings: ${stats.votes_not_sure}</p>
-                <p>Tied crossings: ${stats.votes_tie}</p>
+                
             `;
 
             // Clear existing markers
@@ -188,22 +186,12 @@
                     <h5>Crossing ${crossing.id}</h5>
                     <p>City: ${crossing.city_name}</p>
                     <p>Version: ${crossing.version}</p>
-                    <p>Votes: ${crossing.votes_total}</p>
-                    <p>Status: ${getStatusText(crossing.current_result)}</p>
                     <button class="btn btn-primary" onclick="voteForCrossing('${crossing.id}', ${crossing.city_id}, ${crossing.version_id})">Vote</button>
                 `);
             });
         }
 
-        function getStatusText(status) {
-            switch(status) {
-                case 0: return 'Not Sure';
-                case 1: return 'Compliant';
-                case 2: return 'Non-compliant';
-                case 3: return 'Tied';
-                default: return 'Unknown';
-            }
-        }
+        
 
         async function voteForCrossing(crossingId, cityId, versionId) {
             const userUuid = localStorage.getItem('userUuid') || crypto.randomUUID();
@@ -227,7 +215,7 @@
                 <h5>Vote for crossing ${crossingId}</h5>
                 <div class="btn-group-vertical w-100">
                     <button class="btn btn-success" onclick="submitVote('${crossingId}', 1)">Compliant</button>
-                    <button class="btn btn-danger" onclick="submitVote('${crossingId}', 2)">Non-compliant</button>
+                    <button class="btn btn-danger" onclick="submitVote('${crossingId}', -1)">Non-compliant</button>
                     <button class="btn btn-warning" onclick="submitVote('${crossingId}', 0)">Not Sure</button>
                 </div>
             `;

@@ -2,7 +2,7 @@ import os
 import sys
 import getpass
 from app import create_app, db
-from app.models.models import User, City, CityVersion, Crossing, Meta
+from app.models.models import User, City, CityVersion, Crossing
 from pathlib import Path
 
 def init_db(admin_password=None):
@@ -81,10 +81,6 @@ def init_db(admin_password=None):
         for crossing_data in sample_crossings:
             crossing = Crossing(**crossing_data)
             db.session.add(crossing)
-        
-        # Create initial meta record
-        meta = Meta()
-        db.session.add(meta)
         
         db.session.commit()
         print("Database initialized successfully!")
