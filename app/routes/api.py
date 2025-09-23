@@ -44,8 +44,13 @@ def vote():
         return jsonify({'error': 'Missing required parameters'}), 400
     
     # Validate vote value mapping: -1 = not_okay, 0 = dont_know, 1 = okay
-    if vote_value not in (-1, 0, 1):
+    # Also accept legacy value 2 for backward compatibility (maps to -1)
+    if vote_value not in (-1, 0, 1, 2):
         return jsonify({'error': 'Invalid vote value'}), 400
+    
+    # Map legacy value 2 to -1 for backward compatibility
+    if vote_value == 2:
+        vote_value = -1
     
     # Resolve crossing strictly by id; optionally check city/version if provided
     crossing_query = Crossing.query.filter_by(id=crossing_node_id)

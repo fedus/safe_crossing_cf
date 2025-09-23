@@ -140,6 +140,25 @@ class TestAPI(unittest.TestCase):
         vote_values = [v.vote for v in votes]
         self.assertIn(1, vote_values)  # Original okay vote
         self.assertIn(-1, vote_values)  # New not_okay vote
+        
+        # Test legacy value 2 (should be mapped to -1)
+        response = self.client.post('/api/vote', json={
+            'userUuid': self.user_uuid,
+            'crossingNodeId': 'node/123456789',
+            'vote': 2,  # Legacy value for not_okay
+            'city_id': self.city.id,
+            'version_id': self.version.id
+        })
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['status'], 'VOTE_RECORDED')
+        
+        # Verify legacy vote was mapped correctly
+        votes = Vote.query.filter_by(crossing_id='node/123456789').all()
+        self.assertEqual(len(votes), 3)  # Three separate votes now
+        vote_values = [v.vote for v in votes]
+        self.assertIn(1, vote_values)  # Original okay vote
+        self.assertEqual(vote_values.count(-1), 2)  # Two not_okay votes (one -1, one mapped from 2)
 
     def test_get_user_votes(self):
         # Add a vote
