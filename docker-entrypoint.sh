@@ -6,21 +6,26 @@ set -e
 chown -R appuser:appuser /app/instance
 chown -R appuser:appuser /app/logs
 
-# Wait for potential database to be ready if using external DB (run check as appuser)
-if [ ! -z "$DATABASE_URL" ] && [[ ! "$DATABASE_URL" =~ "sqlite" ]]; then
-    echo "Waiting for database to be ready..."
-    MAX_RETRIES=30
-    RETRY_INTERVAL=2
-    for i in $(seq 1 $MAX_RETRIES); do
-        gosu appuser flask db current &>/dev/null && break # Run check as appuser
-        echo "Database not ready yet. Retry $i of $MAX_RETRIES..."
-        sleep $RETRY_INTERVAL
-    done
-fi
+# Optionally skip migrations
+if [ "$SKIP_DB_MIGRATIONS" = "1" ] || [ "$SKIP_DB_MIGRATIONS" = "true" ]; then
+    echo "Skipping database migrations due to SKIP_DB_MIGRATIONS=$SKIP_DB_MIGRATIONS"
+else
+    # Wait for potential database to be ready if using external DB (run check as appuser)
+    if [ ! -z "$DATABASE_URL" ] && [[ ! "$DATABASE_URL" =~ "sqlite" ]]; then
+        echo "Waiting for database to be ready..."
+        MAX_RETRIES=30
+        RETRY_INTERVAL=2
+        for i in $(seq 1 $MAX_RETRIES); do
+            gosu appuser flask db current &>/dev/null && break # Run check as appuser
+            echo "Database not ready yet. Retry $i of $MAX_RETRIES..."
+            sleep $RETRY_INTERVAL
+        done
+    fi
 
-# Run database migrations as appuser
-echo "Running database migrations..."
-gosu appuser flask db upgrade # Run as appuser
+    # Run database migrations as appuser
+    echo "Running database migrations..."
+    gosu appuser flask db upgrade # Run as appuser
+fi
 
 # Create admin user if it doesn't exist
 echo "Checking for admin user..."

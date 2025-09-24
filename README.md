@@ -425,3 +425,53 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details. 
+
+## Deploy Runbook
+
+### Prerequisites
+- Docker / Docker Compose
+- Volume mounted for `instance/` (SQLite DB persistence)
+
+### One-time: resolve multiple Alembic heads (if present)
+```bash
+# From server repo dir
+git fetch origin
+git reset --hard origin/flask-docker-production
+
+# Build fresh
+docker compose down
+docker compose build --no-cache
+
+# Merge heads and upgrade (bypass entrypoint)
+docker compose run --rm --entrypoint bash web -lc 'export FLASK_APP=run.py; flask db merge -m "merge heads (prod)" heads'
+docker compose run --rm --entrypoint bash web -lc 'export FLASK_APP=run.py; flask db upgrade'
+
+# Start app
+docker compose up -d
+```
+
+### Normal deploy
+```bash
+git fetch origin
+git reset --hard origin/flask-docker-production
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+### Skip auto-migrations on start (optional)
+Set `SKIP_DB_MIGRATIONS=1` in the container env to skip automatic `flask db upgrade` in entrypoint. Useful if you want to run migrations explicitly before start.
+
+```yaml
+# docker-compose.yml example
+environment:
+  - FLASK_ENV=production
+  - ADMIN_PASSWORD=***
+  - SKIP_DB_MIGRATIONS=1
+```
+
+Then run:
+```bash
+docker compose run --rm --entrypoint bash web -lc 'export FLASK_APP=run.py; flask db upgrade'
+docker compose up -d
+``` 
