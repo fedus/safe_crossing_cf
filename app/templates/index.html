@@ -27,6 +27,12 @@
             margin-right: 5px;
             margin-bottom: 5px;
         }
+        .vote-feed {
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -88,19 +94,27 @@
                                 <div class="progress" style="height: 30px;">
                                     {% set total = stats.votes_ok + stats.votes_too_close + stats.votes_not_sure %}
                                     {% if total > 0 %}
-                                    <div class="progress-bar bg-success" style="width: {{ (stats.votes_ok / total * 100)|int }}%">
+                                    <div class="progress-bar bg-success" style="width: 0%" data-width="{{ (stats.votes_ok / total * 100)|int }}">
                                         {{ stats.votes_ok }} Compliant
                                     </div>
-                                    <div class="progress-bar bg-danger" style="width: {{ (stats.votes_too_close / total * 100)|int }}%">
+                                    <div class="progress-bar bg-danger" style="width: 0%" data-width="{{ (stats.votes_too_close / total * 100)|int }}">
                                         {{ stats.votes_too_close }} Non-compliant
                                     </div>
-                                    <div class="progress-bar bg-warning" style="width: {{ (stats.votes_not_sure / total * 100)|int }}%">
+                                    <div class="progress-bar bg-warning" style="width: 0%" data-width="{{ (stats.votes_not_sure / total * 100)|int }}">
                                         {{ stats.votes_not_sure }} Not Sure
                                     </div>
                                     
                                     {% else %}
                                     <div class="progress-bar" style="width: 100%">No votes yet</div>
                                     {% endif %}
+                                </div>
+                                <div class="mt-2">
+                                    <small>
+                                        Crossings with ≥5 votes: {{ stats.crossings_with_enough_votes }} | 
+                                        Compliant: <span class="text-success">{{ stats.compliant_crossings }}</span> · 
+                                        Non-compliant: <span class="text-danger">{{ stats.non_compliant_crossings }}</span> · 
+                                        Unclear: <span class="text-warning">{{ stats.unclear_crossings }}</span>
+                                    </small>
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -131,6 +145,14 @@
                         <div id="stats">
                             Loading statistics...
                         </div>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-header">
+                        Recent Votes
+                    </div>
+                    <div class="card-body">
+                        <div id="recent-votes" class="vote-feed">Loading...</div>
                     </div>
                 </div>
                 <div class="card mt-3">
@@ -166,9 +188,9 @@
             // Update stats display
             document.getElementById('stats').innerHTML = `
                 <p>Total crossings with enough votes: ${stats.crossings_with_enough_votes}</p>
-                <p>Compliant crossings: ${stats.votes_ok}</p>
-                <p>Non-compliant crossings: ${stats.votes_too_close}</p>
-                <p>Unclear crossings: ${stats.votes_not_sure}</p>
+                <p>Compliant crossings: ${stats.compliant_crossings}</p>
+                <p>Non-compliant crossings: ${stats.non_compliant_crossings}</p>
+                <p>Unclear crossings: ${stats.unclear_crossings}</p>
                 
             `;
 
@@ -191,8 +213,20 @@
             });
         }
 
+        async function loadRecentVotes() {
+            const items = await fetch('/recent-votes').then(r => r.json());
+            const container = document.getElementById('recent-votes');
+            if (!items.length) {
+                container.textContent = 'No recent votes';
+                return;
+            }
+            container.innerHTML = items.map(it => {
+                const time = new Date(it.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                const user = it.user || 'unknown';
+                return `${time} - ${user} voted ${it.result} on ${it.crossing_id}`;
+            }).join('\n');
+        }
         
-
         async function voteForCrossing(crossingId, cityId, versionId) {
             const userUuid = localStorage.getItem('userUuid') || crypto.randomUUID();
             localStorage.setItem('userUuid', userUuid);
@@ -244,6 +278,7 @@
             if (response.ok) {
                 alert('Vote recorded successfully!');
                 loadData(); // Reload data to update display
+                loadRecentVotes();
             } else {
                 alert('Error recording vote');
             }
@@ -251,6 +286,18 @@
 
         // Load initial data
         loadData();
+        loadRecentVotes();
+
+        // Initialize progress widths after DOM update
+        (function initProgressWidths(){
+            const container = document.querySelector('.progress');
+            if (!container) return;
+            const bars = container.querySelectorAll('[data-width]');
+            bars.forEach(bar => {
+                const w = parseInt(bar.getAttribute('data-width') || '0', 10);
+                bar.style.width = `${Math.max(0, Math.min(100, w))}%`;
+            });
+        })();
     </script>
 </body>
 </html> 

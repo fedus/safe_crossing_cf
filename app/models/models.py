@@ -7,6 +7,25 @@ from werkzeug.security import generate_password_hash, check_password_hash
 def load_user(user_id):
     return User.query.get(user_id)
 
+class AppConfig(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    votes_limit = db.Column(db.Integer, default=5)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @staticmethod
+    def get_solo():
+        try:
+            cfg = AppConfig.query.get(1)
+        except Exception:
+            # Table may not exist yet; create missing tables and retry
+            db.create_all()
+            cfg = AppConfig.query.get(1)
+        if not cfg:
+            cfg = AppConfig(id=1, votes_limit=5)
+            db.session.add(cfg)
+            db.session.commit()
+        return cfg
+
 class User(UserMixin, db.Model):
     id = db.Column(db.String(36), primary_key=True)  # UUID
     initialized = db.Column(db.Boolean, default=False)

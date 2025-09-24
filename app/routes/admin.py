@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.models.models import City, CityVersion, Crossing, Vote, db
+from app.models.models import City, CityVersion, Crossing, Vote, db, AppConfig
 from functools import wraps
 import json
 
@@ -20,7 +20,26 @@ def admin_required(f):
 @admin_required
 def index():
     cities = City.query.all()
-    return render_template('admin/index.html', cities=cities)
+    config = AppConfig.get_solo()
+    return render_template('admin/index.html', cities=cities, config=config)
+
+@admin_bp.route('/settings', methods=['POST'])
+@login_required
+@admin_required
+def update_settings():
+    try:
+        votes_limit = request.form.get('votes_limit', type=int)
+        if votes_limit is None or votes_limit < 1:
+            flash('Votes threshold must be a positive integer', 'error')
+            return redirect(url_for('admin.index'))
+        cfg = AppConfig.get_solo()
+        cfg.votes_limit = votes_limit
+        db.session.commit()
+        flash('Settings updated', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Failed to update settings: {str(e)}', 'error')
+    return redirect(url_for('admin.index'))
 
 @admin_bp.route('/cities', methods=['GET', 'POST'])
 @login_required

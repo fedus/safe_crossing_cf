@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, redirect, url_fo
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
-from app.models.models import Crossing, User, City, CityVersion, Vote
+from app.models.models import Crossing, User, City, CityVersion, Vote, AppConfig
 from datetime import datetime, timedelta
 
 bp = Blueprint('main', __name__)
@@ -24,7 +24,7 @@ def index():
         if av:
             active_version_ids.append(av.id)
 
-    votes_limit = 5
+    votes_limit = AppConfig.get_solo().votes_limit
 
     # Crossings with enough votes
     crossings_with_enough_votes = 0
@@ -40,7 +40,7 @@ def index():
             votes_per_crossing_subq.c.vote_count >= votes_limit
         ).scalar() or 0
 
-    # Global distribution of vote categories
+    # Global distribution of vote categories (all votes)
     vote_totals = db.session.query(
         func.sum(case((Vote.vote == 1, 1), else_=0)).label('votes_ok'),
         func.sum(case((Vote.vote == -1, 1), else_=0)).label('votes_too_close'),
@@ -133,26 +133,53 @@ def get_crossings():
 @bp.route('/stats')
 def get_stats():
     from sqlalchemy import func, case
-    votes_limit = 5
+    votes_limit = AppConfig.get_solo().votes_limit
 
     # Crossings with enough votes across all active versions
     active_versions = CityVersion.query.filter_by(is_active=True).all()
     active_version_ids = [v.id for v in active_versions]
 
     crossings_with_enough_votes = 0
+    compliant_crossings = 0
+    non_compliant_crossings = 0
+    unclear_crossings = 0
+
     if active_version_ids:
-        votes_per_crossing_subq = db.session.query(
+        # Aggregate per crossing
+        crossing_agg = db.session.query(
             Crossing.id.label('crossing_id'),
-            func.count(Vote.id).label('vote_count')
+            func.sum(case((Vote.vote == 1, 1), else_=0)).label('okay'),
+            func.sum(case((Vote.vote == -1, 1), else_=0)).label('not_okay'),
+            func.sum(case((Vote.vote == 0, 1), else_=0)).label('dont_know'),
+            func.count(Vote.id).label('total')
         ).join(Vote, Vote.crossing_id == Crossing.id).filter(
             Crossing.version_id.in_(active_version_ids)
-        ).group_by(Crossing.id).subquery()
+        ).group_by(Crossing.id).having(func.count(Vote.id) >= votes_limit).all()
 
-        crossings_with_enough_votes = db.session.query(func.count()).filter(
-            votes_per_crossing_subq.c.vote_count >= votes_limit
-        ).scalar() or 0
+        crossings_with_enough_votes = len(crossing_agg)
 
-    # Global distribution of vote categories
+        # Classify each crossing by majority
+        for row in crossing_agg:
+            count_ok = int(row.okay or 0)
+            count_not_ok = int(row.not_okay or 0)
+            count_dk = int(row.dont_know or 0)
+            max_count = max(count_ok, count_not_ok, count_dk)
+            winners = [n for n, v in (
+                ('ok', count_ok),
+                ('not_ok', count_not_ok),
+                ('dk', count_dk)
+            ) if v == max_count]
+            if len(winners) > 1:
+                unclear_crossings += 1
+            else:
+                if winners[0] == 'ok':
+                    compliant_crossings += 1
+                elif winners[0] == 'not_ok':
+                    non_compliant_crossings += 1
+                else:
+                    unclear_crossings += 1
+
+    # Global distribution of vote categories (all votes)
     totals = db.session.query(
         func.sum(case((Vote.vote == 1, 1), else_=0)).label('votes_ok'),
         func.sum(case((Vote.vote == -1, 1), else_=0)).label('votes_too_close'),
@@ -161,12 +188,39 @@ def get_stats():
 
     return jsonify({
         'crossings_with_enough_votes': int(crossings_with_enough_votes),
+        'compliant_crossings': int(compliant_crossings),
+        'non_compliant_crossings': int(non_compliant_crossings),
+        'unclear_crossings': int(unclear_crossings),
+        # Keep previous fields for compatibility
         'votes_not_sure': int((totals.votes_not_sure or 0)),
         'votes_ok': int((totals.votes_ok or 0)),
         'votes_too_close': int((totals.votes_too_close or 0)),
-        'votes_tie': 0
+        'votes_tie': 0,
+        'votes_limit': votes_limit
     })
 
 @bp.route('/health')
 def health_check():
-    return jsonify({"status": "healthy"}), 200 
+    return jsonify({"status": "healthy"}), 200
+
+@bp.route('/recent-votes')
+def recent_votes_feed():
+    # Return latest 20 votes
+    votes = Vote.query.order_by(Vote.created_at.desc()).limit(20).all()
+
+    def map_vote(v):
+        if v == 1:
+            return 'Compliant'
+        if v == -1:
+            return 'Non Compliant'
+        return 'Not Sure'
+
+    items = []
+    for v in votes:
+        items.append({
+            'time': v.created_at.isoformat(),
+            'user': (v.user_id or '')[:8],
+            'crossing_id': v.crossing_id,
+            'result': map_vote(v.vote)
+        })
+    return jsonify(items) 
