@@ -20,9 +20,17 @@ depends_on = None
 
 def upgrade():
     """Upgrade schema."""
-    op.add_column('user', sa.Column('fcm_token', sa.String(255), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {col['name'] for col in inspector.get_columns('user')}
+    if 'fcm_token' not in columns:
+        op.add_column('user', sa.Column('fcm_token', sa.String(255), nullable=True))
 
 
 def downgrade():
     """Downgrade schema."""
-    op.drop_column('user', 'fcm_token')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {col['name'] for col in inspector.get_columns('user')}
+    if 'fcm_token' in columns:
+        op.drop_column('user', 'fcm_token')
