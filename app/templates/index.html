@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Crossing</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        :root { --brand-green:#0B3B24; --brand-green-dark:#062817; --brand-green-light:#145C38; --brand-yellow:#FFD521; --grey-900:#212121; --grey-600:#757575; --grey-100:#F5F5F5; --white:#FFFFFF; }
+        *, *::before, *::after { box-sizing: border-box; }
+        body { margin:0; background: var(--grey-100); color: var(--grey-900); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; }
+        a { color: inherit; text-decoration: none; }
+        .nav { background: var(--brand-green); color: var(--white); padding: 14px 20px; display:flex; align-items:center; justify-content: space-between; }
+        .nav .brand { font-weight: 700; letter-spacing: .2px; }
+        .nav a.btn { background: var(--brand-yellow); color: var(--grey-900); padding:8px 12px; border-radius: 10px; font-weight:600; }
+        .container { max-width: 1200px; margin: 18px auto; padding: 0 16px; }
+        .grid { display: grid; gap: 16px; }
+        .grid.two { grid-template-columns: 2fr 1fr; }
+        @media (max-width: 960px){ .grid.two { grid-template-columns: 1fr; } }
+        .card { background: var(--white); border:1px solid #e6e6e6; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .card-header { padding: 16px 18px; border-bottom:1px solid #eee; font-weight: 600; }
+        .card-body { padding: 16px 18px; }
+        .stats { display:grid; gap:12px; grid-template-columns: repeat(4,1fr); }
+        @media (max-width: 960px){ .stats { grid-template-columns: repeat(2,1fr); } }
+        .stat { padding:14px; border-radius:10px; border:1px solid #eee; }
+        .stat .num { font-size: 28px; font-weight: 700; }
+        .stat .lbl { font-size: 12px; color: var(--grey-600); text-transform: uppercase; letter-spacing:.3px; }
+        .progress { height: 16px; width:100%; background:#f0f0f0; border-radius: 999px; overflow:hidden; display:flex; }
+        .bar { height:100%; }
+        .bar.ok { background:#c8ebd6; }
+        .bar.bad { background:#f6c8c5; }
+        .bar.unclear { background:#ffeaaa; }
+        .pills { display:flex; flex-wrap:wrap; gap:8px; }
+        .pill { background:#e8f4fa; color:#0b4f6c; padding:6px 10px; border-radius: 999px; font-size: 12px; }
+        #map { height: 560px; width:100%; border-radius: 12px; }
+        .vote-feed { max-height: 300px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
+        .btn { display:inline-block; padding:10px 14px; border-radius: 10px; border:0; cursor:pointer; font-weight:600; }
+        .btn-primary { background: var(--brand-green-light); color: var(--white); }
+        .btn-success { background:#2e7d32; color:#fff; }
+        .btn-danger { background:#c62828; color:#fff; }
+        .btn-warning { background: var(--brand-yellow); color: var(--grey-900); }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <div class="brand">Safe Crossing</div>
+        <a class="btn" href="{{ url_for('main.login') }}">Admin Login</a>
+    </div>
+
+    <div class="container">
+        <div class="card" style="margin-bottom:16px;">
+            <div class="card-header">Safe Crossing Dashboard</div>
+            <div class="card-body">
+                <div class="stats">
+                    <div class="stat">
+                        <div class="num">{{ total_votes }}</div>
+                        <div class="lbl">Total Votes</div>
+                    </div>
+                    <div class="stat">
+                        <div class="num">{{ recent_votes }}</div>
+                        <div class="lbl">Votes in last 24h</div>
+                    </div>
+                    <div class="stat">
+                        <div class="num">{{ total_crossings }}</div>
+                        <div class="lbl">Active Crossings</div>
+                    </div>
+                    <div class="stat">
+                        <div class="num">{{ stats.crossings_with_enough_votes }}</div>
+                        <div class="lbl">Crossings ≥5 votes</div>
+                    </div>
+                </div>
+                <div class="grid two" style="margin-top:16px;">
+                    <div>
+                        <div style="margin-bottom:8px; font-weight:600;">Vote Results</div>
+                        {% set total = stats.votes_ok + stats.votes_too_close + stats.votes_not_sure %}
+                        <div class="progress">
+                            {% if total > 0 %}
+                            <div class="bar ok" style="width: {{ (stats.votes_ok / total * 100)|int }}%"></div>
+                            <div class="bar bad" style="width: {{ (stats.votes_too_close / total * 100)|int }}%"></div>
+                            <div class="bar unclear" style="width: {{ (stats.votes_not_sure / total * 100)|int }}%"></div>
+                            {% else %}
+                            <div class="bar" style="width:100%; background:#eee;"></div>
+                            {% endif %}
+                        </div>
+                        <div style="margin-top:6px; color:var(--grey-600); font-size:12px;">
+                            Crossings with ≥5 votes: {{ stats.crossings_with_enough_votes }} ·
+                            Compliant: {{ stats.compliant_crossings }} ·
+                            Non-compliant: {{ stats.non_compliant_crossings }} ·
+                            Unclear: {{ stats.unclear_crossings }}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="margin-bottom:8px; font-weight:600;">Active Cities</div>
+                        <div class="pills">
+                            {% for city in cities %}
+                                <span class="pill">{{ city.name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="grid two">
+            <div class="card">
+                <div class="card-body">
+                    <div id="map"></div>
+                </div>
+            </div>
+            <div class="grid" style="gap:16px;">
+                <div class="card">
+                    <div class="card-header">Statistics</div>
+                    <div class="card-body"><div id="stats">Loading statistics...</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Recent Votes</div>
+                    <div class="card-body"><div id="recent-votes" class="vote-feed">Loading...</div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Voting Controls</div>
+                    <div class="card-body"><div id="voting-controls">Please select a crossing on the map to vote.</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([49.6116, 6.1319], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Load crossings and stats
+        async function loadData() {
+            const [crossings, stats] = await Promise.all([
+                fetch('/crossings').then(r => r.json()),
+                fetch('/stats').then(r => r.json())
+            ]);
+
+            // Update stats display
+            document.getElementById('stats').innerHTML = `
+                <p>Total crossings with enough votes: ${stats.crossings_with_enough_votes}</p>
+                <p>Compliant crossings: ${stats.compliant_crossings}</p>
+                <p>Non-compliant crossings: ${stats.non_compliant_crossings}</p>
+                <p>Unclear crossings: ${stats.unclear_crossings}</p>
+                
+            `;
+
+            // Clear existing markers
+            map.eachLayer((layer) => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+
+            // Colored markers by status
+            const iconMap = {
+                ok: L.divIcon({className:'pin pin-ok'}),
+                not_ok: L.divIcon({className:'pin pin-bad'}),
+                dk: L.divIcon({className:'pin pin-unclear'}),
+                tie: L.divIcon({className:'pin pin-unclear'}),
+                insufficient: L.divIcon({className:'pin pin-insufficient'})
+            };
+            const style = document.createElement('style');
+            style.textContent = `
+                .pin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
+                .pin-ok { background:#2e7d32; }
+                .pin-bad { background:#c62828; }
+                .pin-unclear { background:#f4b400; }
+                .pin-insufficient { background:#9e9e9e; }
+            `;
+            document.head.appendChild(style);
+
+            crossings.forEach(crossing => {
+                const marker = L.marker([crossing.lat, crossing.lon], {icon: iconMap[crossing.status || 'insufficient']}).addTo(map);
+                marker.bindPopup(`
+                    <h5>Crossing ${crossing.id}</h5>
+                    <p>City: ${crossing.city_name}</p>
+                    <p>Version: ${crossing.version}</p>
+                    <button class="btn btn-primary" onclick="voteForCrossing('${crossing.id}', ${crossing.city_id}, ${crossing.version_id})">Vote</button>
+                `);
+            });
+        }
+
+        async function loadRecentVotes() {
+            const items = await fetch('/recent-votes').then(r => r.json());
+            const container = document.getElementById('recent-votes');
+            if (!items.length) {
+                container.textContent = 'No recent votes';
+                return;
+            }
+            container.innerHTML = items.map(it => {
+                const time = new Date(it.time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                const user = it.user || 'unknown';
+                return `${time} - ${user} voted ${it.result} on ${it.crossing_id}`;
+            }).join('\n');
+        }
+        
+        async function voteForCrossing(crossingId, cityId, versionId) {
+            const userUuid = localStorage.getItem('userUuid') || crypto.randomUUID();
+            localStorage.setItem('userUuid', userUuid);
+            
+            // Store city and version information for voting
+            localStorage.setItem('currentCrossingCityId', cityId);
+            localStorage.setItem('currentCrossingVersionId', versionId);
+
+            // Initialize user if needed
+            await fetch('/api/initialize-user', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userUuid })
+            });
+
+            // Show voting controls
+            document.getElementById('voting-controls').innerHTML = `
+                <h5>Vote for crossing ${crossingId}</h5>
+                <div class="btn-group-vertical w-100">
+                    <button class="btn btn-success" onclick="submitVote('${crossingId}', 1)">Compliant</button>
+                    <button class="btn btn-danger" onclick="submitVote('${crossingId}', -1)">Non-compliant</button>
+                    <button class="btn btn-warning" onclick="submitVote('${crossingId}', 0)">Not Sure</button>
+                </div>
+            `;
+        }
+
+        async function submitVote(crossingId, vote) {
+            const userUuid = localStorage.getItem('userUuid');
+            // Get the stored city and version IDs
+            const cityId = localStorage.getItem('currentCrossingCityId');
+            const versionId = localStorage.getItem('currentCrossingVersionId');
+            
+            const response = await fetch('/api/vote', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    userUuid,
+                    crossingNodeId: crossingId,
+                    vote,
+                    city_id: cityId,
+                    version_id: versionId
+                })
+            });
+
+            if (response.ok) {
+                alert('Vote recorded successfully!');
+                loadData(); // Reload data to update display
+                loadRecentVotes();
+            } else {
+                alert('Error recording vote');
+            }
+        }
+
+        // Load initial data
+        loadData();
+        loadRecentVotes();
+
+        // Initialize progress widths after DOM update
+        (function initProgressWidths(){
+            const container = document.querySelector('.progress');
+            if (!container) return;
+            const bars = container.querySelectorAll('[data-width]');
+            bars.forEach(bar => {
+                const w = parseInt(bar.getAttribute('data-width') || '0', 10);
+                bar.style.width = `${Math.max(0, Math.min(100, w))}%`;
+            });
+        })();
+    </script>
+</body>
+</html> 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Panel{% endblock %}</title>
+    <style>
+        :root {
+            --brand-green: #0B3B24;
+            --brand-green-dark: #062817;
+            --brand-green-light: #145C38;
+            --brand-yellow: #FFD521;
+            --brand-yellow-soft: #FFE873;
+            --brand-yellow-dark: #B28F00;
+            --white: #FFFFFF;
+            --grey-900: #212121;
+            --grey-600: #757575;
+            --grey-100: #F5F5F5;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            background: var(--grey-100);
+            color: var(--grey-900);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+        .sidebar {
+            background: var(--brand-green);
+            color: var(--white);
+            padding: 24px 16px;
+        }
+        .sidebar h4 { margin: 0 0 16px; font-weight: 700; letter-spacing: 0.2px; }
+        .nav-link { display: block; color: var(--white); text-decoration: none; padding: 10px 12px; border-radius: 8px; margin-bottom: 6px; opacity: 0.9; }
+        .nav-link:hover { background: var(--brand-green-light); opacity: 1; }
+        .nav-link.active { background: var(--brand-yellow); color: var(--grey-900); font-weight: 600; }
+
+        .main-content { padding: 28px; }
+        .card {
+            background: var(--white);
+            border-radius: 12px;
+            border: 1px solid #e6e6e6;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+            padding: 18px 18px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+        .card h3 { margin: 0 0 10px; font-size: 18px; }
+
+        .btn { display: inline-block; padding: 10px 14px; border-radius: 10px; border: 0; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: var(--brand-green-light); color: var(--white); }
+        .btn-warning { background: var(--brand-yellow); color: var(--grey-900); }
+        .btn-info { background: #d5eef1; color: #0a5560; }
+        .btn:hover { filter: brightness(0.95); }
+
+        .form-label { display: block; font-size: 13px; color: var(--grey-600); margin: 10px 0 6px; }
+        .form-control, .form-select { width: 100%; max-width: 100%; padding: 10px 12px; border: 1px solid #e1e1e1; border-radius: 10px; font-size: 14px; background: var(--white); }
+        .form-control:focus, .form-select:focus { outline: 2px solid var(--brand-yellow-soft); border-color: var(--brand-yellow); }
+
+        .d-flex { display: flex; }
+        .gap-2 { gap: 8px; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #eee; text-align: left; }
+        thead th { font-size: 12px; color: var(--grey-600); text-transform: uppercase; letter-spacing: 0.3px; }
+
+        .alert { padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+        .alert-success { background: #e9f6ef; color: #0b5137; border: 1px solid #b7e2c9; }
+        .alert-warning { background: #fff8e1; color: #7b5a00; border: 1px solid #ffecb3; }
+        .alert-error { background: #fdecea; color: #8a1c17; border: 1px solid #f5c6cb; }
+        .alert-info { background: #e8f4fa; color: #0b4f6c; border: 1px solid #b3e0f2; }
+
+        .grid { display: grid; gap: 16px; }
+        .grid.two { grid-template-columns: 1fr 1fr; }
+        .grid.three { grid-template-columns: repeat(3, 1fr); }
+        @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } .sidebar { border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; } .grid.two, .grid.three { grid-template-columns: 1fr; } }
+
+        /* Reusable lightweight modal styles */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display:none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal-card { background: var(--white); border: 1px solid #e6e6e6; border-radius: 12px; width: 96vw; max-width: 720px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+        .modal-header { padding: 14px 16px; border-bottom: 1px solid #eee; display:flex; align-items:center; justify-content: space-between; }
+        .modal-title { margin:0; font-size: 18px; font-weight: 600; }
+        .modal-body { padding: 16px; }
+        .modal-footer { padding: 14px 16px; border-top: 1px solid #eee; display:flex; gap:8px; justify-content: flex-end; }
+        .btn-close { background: transparent; border:0; font-size: 18px; cursor:pointer; color: var(--grey-600); }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="sidebar">
+            <h4>Admin Panel</h4>
+            <a class="nav-link" href="{{ url_for('admin.index') }}">Dashboard</a>
+            <a class="nav-link" href="{{ url_for('admin.manage_cities') }}">Manage Cities</a>
+            <a class="nav-link" href="{{ url_for('admin.notifications') }}">Push Notifications</a>
+            <a class="nav-link" href="{{ url_for('main.index') }}">Back to Main Site</a>
+        </div>
+        <div class="main-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

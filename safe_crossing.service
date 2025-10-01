@@ -1,0 +1,19 @@
+[Unit]
+Description=Safe Crossing Flask Application
+After=network.target
+
+[Service]
+User=thorben
+Group=www-data
+WorkingDirectory=/var/www/safecrossingcf2
+Environment="PATH=/var/www/safecrossingcf2/venv/bin"
+Environment="FLASK_APP=run.py"
+Environment="FLASK_ENV=production"
+Environment="FLASK_DEBUG=false"
+Environment="SECRET_KEY=your-secret-key-here"
+Environment="DATABASE_URL=sqlite:////var/www/safecrossingcf2/instance/safe_crossing.db"
+ExecStart=/var/www/safecrossingcf2/venv/bin/gunicorn --workers 4 --bind 127.0.0.1:5420 --timeout 120 run:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target 
