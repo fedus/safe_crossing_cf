@@ -3,10 +3,10 @@
 {% block title %}Push Notifications{% endblock %}
 
 {% block content %}
-<h2>Push Notifications</h2>
+<h2 style="margin:0 0 12px;">Push Notifications</h2>
 
-<div class="row mt-4">
-    <div class="col-md-6">
+<div class="grid two">
+    <div class="card">
         <h3>Compose & Target</h3>
         <form method="POST" action="{{ url_for('admin.notifications') }}">
             <div class="mb-3">
@@ -60,11 +60,11 @@
             </div>
         </form>
     </div>
-    <div class="col-md-6">
+    <div class="card">
         <h3>Recent Notifications</h3>
         {% if notification_logs %}
         <div class="table-responsive">
-            <table class="table table-sm">
+            <table>
                 <thead>
                     <tr>
                         <th>Time</th>
