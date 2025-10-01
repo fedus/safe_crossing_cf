@@ -284,7 +284,8 @@ def _send_test_to_user(log_id, user_id):
         flash('User has no FCM token linked', 'error')
         return redirect(url_for('admin.notifications'))
 
-    if messaging is None:
+    # Ensure Firebase is initialized for test sends as well
+    if not ensure_fcm_initialized():
         flash('FCM not configured on server', 'error')
         return redirect(url_for('admin.notifications'))
 
