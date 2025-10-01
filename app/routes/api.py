@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app import db
-from app.models.models import User, Crossing, Vote, City, CityVersion
+from app.models.models import User, Crossing, Vote, City, CityVersion, UserDeviceToken
 from sqlalchemy import func
 import uuid
 import random
@@ -345,15 +345,29 @@ def link_fcm_token():
     data = request.get_json()
     user_id = data.get('user_id')
     fcm_token = data.get('fcm_token')
+    platform = (data.get('platform') or '').lower()  # optional: ios|android|web
     
     if not all([user_id, fcm_token]):
         return jsonify({'error': 'Missing required parameters'}), 400
     
     user = User.query.get(user_id)
     if not user:
-        return jsonify({'error': 'User not found'}), 404
+        # Auto-create user if needed
+        user = User(id=user_id, initialized=True)
+        db.session.add(user)
+        db.session.flush()
     
+    # Keep legacy single-token field for backward compatibility
     user.fcm_token = fcm_token
+    
+    # Upsert device token
+    existing = UserDeviceToken.query.filter_by(token=fcm_token).first()
+    if existing:
+        existing.user_id = user.id
+        existing.platform = platform or existing.platform
+        existing.valid = True
+    else:
+        db.session.add(UserDeviceToken(user_id=user.id, token=fcm_token, platform=platform or None, valid=True))
     db.session.commit()
     
     return jsonify({'status': 'FCM_TOKEN_LINKED'})

@@ -3,20 +3,35 @@
 {% block title %}Manage Crossings - {{ city.name }} (Version {{ version.version_number }}){% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Manage Crossings - {{ city.name }} (Version {{ version.version_number }})</h2>
+<style>
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display:none; align-items: center; justify-content: center; z-index: 1000; }
+.modal-overlay.active { display: flex; }
+.modal-card { background: var(--white); border: 1px solid #e6e6e6; border-radius: 12px; width: 96vw; max-width: 720px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+.modal-header { padding: 14px 16px; border-bottom: 1px solid #eee; display:flex; align-items:center; justify-content: space-between; }
+.modal-title { margin:0; font-size: 18px; font-weight: 600; }
+.modal-body { padding: 16px; }
+.modal-footer { padding: 14px 16px; border-top: 1px solid #eee; display:flex; gap:8px; justify-content: flex-end; }
+.btn-close { background: transparent; border:0; font-size: 18px; cursor:pointer; color: var(--grey-600); }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; }
+.bg-success { background:#e9f6ef; color:#0b5137; }
+.bg-danger { background:#fdecea; color:#8a1c17; }
+.bg-warning { background:#fff8e1; color:#7b5a00; }
+.bg-info { background:#e8f4fa; color:#0b4f6c; }
+.table { width:100%; border-collapse: collapse; }
+.table th, .table td { padding:10px 12px; border-bottom:1px solid #eee; text-align:left; }
+.table thead th { font-size:12px; color:var(--grey-600); text-transform: uppercase; letter-spacing: .3px; }
+</style>
+
+<div class="d-flex" style="justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2 style="margin:0;">Manage Crossings - {{ city.name }} (Version {{ version.version_number }})</h2>
     <div>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
-            Bulk Import
-        </button>
-        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCrossingModal">
-            Add Single Crossing
-        </button>
+        <button type="button" class="btn btn-primary" onclick="openModal('bulkImportModal')">Bulk Import</button>
+        <button type="button" class="btn btn-primary" onclick="openModal('addCrossingModal')">Add Single Crossing</button>
     </div>
-</div>
+    </div>
 
 <div class="table-responsive">
-    <table class="table table-striped">
+    <table class="table">
         <thead>
             <tr>
                 <th>Node ID</th>
@@ -42,10 +57,10 @@
                     <span class="badge bg-info">{{ counts.total }}</span>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-warning" onclick="editCrossing('{{ crossing.id }}')">
+                    <button class="btn btn-warning" onclick="editCrossing('{{ crossing.id }}')">
                         Edit
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCrossing('{{ crossing.id }}')">
+                    <button class="btn btn-warning" onclick="deleteCrossing('{{ crossing.id }}')">
                         Delete
                     </button>
                 </td>
@@ -56,14 +71,13 @@
 </div>
 
 <!-- Bulk Import Modal -->
-<div class="modal fade" id="bulkImportModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Bulk Import Crossings</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
+<div class="modal-overlay" id="bulkImportModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Bulk Import Crossings</h5>
+            <button type="button" class="btn-close" onclick="closeModal('bulkImportModal')">×</button>
+        </div>
+        <div class="modal-body">
                 <div class="mb-3">
                     <label for="crossingsData" class="form-label">Crossings Data (JSON)</label>
                     <textarea class="form-control" id="crossingsData" rows="10" placeholder='[
@@ -76,24 +90,22 @@
   }
 ]'></textarea>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="bulkImport()">Import</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeModal('bulkImportModal')">Close</button>
+            <button type="button" class="btn btn-primary" onclick="bulkImport()">Import</button>
         </div>
     </div>
 </div>
 
 <!-- Add Single Crossing Modal -->
-<div class="modal fade" id="addCrossingModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Single Crossing</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
+<div class="modal-overlay" id="addCrossingModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Add Single Crossing</h5>
+            <button type="button" class="btn-close" onclick="closeModal('addCrossingModal')">×</button>
+        </div>
+        <div class="modal-body">
                 <div class="mb-3">
                     <label for="nodeId" class="form-label">Node ID</label>
                     <input type="text" class="form-control" id="nodeId" required>
@@ -114,24 +126,22 @@
                     <label for="lon" class="form-label">Longitude</label>
                     <input type="number" step="any" class="form-control" id="lon" required>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="addSingleCrossing()">Add</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeModal('addCrossingModal')">Close</button>
+            <button type="button" class="btn btn-primary" onclick="addSingleCrossing()">Add</button>
         </div>
     </div>
 </div>
 
 <!-- Edit Crossing Modal -->
-<div class="modal fade" id="editCrossingModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Edit Crossing</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
+<div class="modal-overlay" id="editCrossingModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Edit Crossing</h5>
+            <button type="button" class="btn-close" onclick="closeModal('editCrossingModal')">×</button>
+        </div>
+        <div class="modal-body">
                 <input type="hidden" id="editNodeId">
                 <div class="mb-3">
                     <label for="editNeighbourhood" class="form-label">Neighbourhood</label>
@@ -149,11 +159,10 @@
                     <label for="editLon" class="form-label">Longitude</label>
                     <input type="number" step="any" class="form-control" id="editLon" required>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="updateCrossing()">Save Changes</button>
-            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeModal('editCrossingModal')">Close</button>
+            <button type="button" class="btn btn-primary" onclick="updateCrossing()">Save Changes</button>
         </div>
     </div>
 </div>
@@ -161,6 +170,8 @@
 
 {% block scripts %}
 <script>
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 function bulkImport() {
     const crossingsData = document.getElementById('crossingsData').value;
     try {
@@ -234,7 +245,7 @@ function editCrossing(nodeId) {
             document.getElementById('editLat').value = lat;
             document.getElementById('editLon').value = lon;
             
-            new bootstrap.Modal(document.getElementById('editCrossingModal')).show();
+            openModal('editCrossingModal');
             break;
         }
     }

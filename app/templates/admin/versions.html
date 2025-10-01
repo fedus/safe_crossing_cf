@@ -3,11 +3,9 @@
 {% block title %}Manage Versions - {{ city.name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Manage Versions - {{ city.name }}</h2>
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVersionModal">
-        Add New Version
-    </button>
+<div class="d-flex" style="justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2 style="margin:0;">Manage Versions - {{ city.name }}</h2>
+    <button type="button" class="btn btn-primary" onclick="openModal('addVersionModal')">Add New Version</button>
 </div>
 
 <div class="table-responsive">
@@ -61,15 +59,14 @@
 </div>
 
 <!-- Add Version Modal -->
-<div class="modal fade" id="addVersionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New Version</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ url_for('admin.manage_versions', city_id=city.id) }}">
-                <div class="modal-body">
+<div class="modal-overlay" id="addVersionModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Add New Version</h5>
+            <button type="button" class="btn-close" onclick="closeModal('addVersionModal')">×</button>
+        </div>
+        <form method="POST" action="{{ url_for('admin.manage_versions', city_id=city.id) }}">
+            <div class="modal-body">
                     <div class="mb-3">
                         <label for="version_number" class="form-label">Version Number</label>
                         <input type="number" class="form-control" id="version_number" name="version_number" required>
@@ -78,19 +75,20 @@
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Add Version</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('addVersionModal')">Close</button>
+                <button type="submit" class="btn btn-primary">Add Version</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 document.addEventListener('DOMContentLoaded', function() {
     // Toggle version active status
     document.querySelectorAll('.toggle-active').forEach(button => {

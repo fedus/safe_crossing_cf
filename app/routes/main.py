@@ -120,6 +120,39 @@ def get_crossings():
         Crossing.version_id.in_(active_versions.values())
     ).all()
 
+    # Compute per-crossing tallies to color markers
+    from sqlalchemy import func, case
+    votes_limit = AppConfig.get_solo().votes_limit
+    counts_rows = db.session.query(
+        Vote.crossing_id,
+        func.sum(case((Vote.vote == 1, 1), else_=0)).label('ok'),
+        func.sum(case((Vote.vote == -1, 1), else_=0)).label('not_ok'),
+        func.sum(case((Vote.vote == 0, 1), else_=0)).label('dk'),
+        func.count(Vote.id).label('total')
+    ).filter(
+        Vote.crossing_id.in_([c.id for c in crossings])
+    ).group_by(Vote.crossing_id).all()
+
+    counts_by_id = {row.crossing_id: {
+        'ok': int(row.ok or 0),
+        'not_ok': int(row.not_ok or 0),
+        'dk': int(row.dk or 0),
+        'total': int(row.total or 0)
+    } for row in counts_rows}
+
+    def classify(cid):
+        m = counts_by_id.get(cid, {'ok':0,'not_ok':0,'dk':0,'total':0})
+        if m['total'] < votes_limit:
+            return 'insufficient'
+        winners = []
+        maxv = max(m['ok'], m['not_ok'], m['dk'])
+        if m['ok'] == maxv: winners.append('ok')
+        if m['not_ok'] == maxv: winners.append('not_ok')
+        if m['dk'] == maxv: winners.append('dk')
+        if len(winners) > 1:
+            return 'tie'
+        return winners[0]
+
     return jsonify([{
         'id': c.id,
         'city_id': c.city_id,
@@ -127,7 +160,8 @@ def get_crossings():
         'version_id': c.version_id,
         'version': c.version.version_number,
         'lat': c.lat,
-        'lon': c.lon
+        'lon': c.lon,
+        'status': classify(c.id)
     } for c in crossings])
 
 @bp.route('/stats')

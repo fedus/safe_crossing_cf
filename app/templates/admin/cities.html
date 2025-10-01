@@ -3,11 +3,10 @@
 {% block title %}Manage Cities{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Manage Cities</h2>
-    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCityModal">
-        Add New City
-    </button>
+<div class="d-flex" style="justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <h2 style="margin:0;">Manage Cities</h2>
+    <button type="button" class="btn btn-primary" onclick="openModal('addCityModal')">Add New City</button>
+    
 </div>
 
 <div class="table-responsive">
@@ -61,15 +60,14 @@
 </div>
 
 <!-- Add City Modal -->
-<div class="modal fade" id="addCityModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add New City</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" action="{{ url_for('admin.manage_cities') }}">
-                <div class="modal-body">
+<div class="modal-overlay" id="addCityModal">
+    <div class="modal-card" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h5 class="modal-title">Add New City</h5>
+            <button type="button" class="btn-close" onclick="closeModal('addCityModal')">×</button>
+        </div>
+        <form method="POST" action="{{ url_for('admin.manage_cities') }}">
+            <div class="modal-body">
                     <div class="mb-3">
                         <label for="name" class="form-label">City Name</label>
                         <input type="text" class="form-control" id="name" name="name" required>
@@ -90,19 +88,20 @@
                         <label for="subtitle" class="form-label">Subtitle</label>
                         <input type="text" class="form-control" id="subtitle" name="subtitle" placeholder="City of bridges and crossings.">
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Add City</button>
-                </div>
-            </form>
-        </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('addCityModal')">Close</button>
+                <button type="submit" class="btn btn-primary">Add City</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function openModal(id){ document.getElementById(id).classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 document.addEventListener('DOMContentLoaded', function() {
     const toggleButtons = document.querySelectorAll('.toggle-status');
     

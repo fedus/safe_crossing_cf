@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
-from app.models.models import City, CityVersion, Crossing, Vote, db, AppConfig, NotificationLog, User
+from app.models.models import City, CityVersion, Crossing, Vote, db, AppConfig, NotificationLog, User, UserDeviceToken
 from functools import wraps
 import json
 import os
@@ -163,27 +163,41 @@ def notifications():
             users_to_null = []
             try:
                 users = users_q.all()
+                # Gather tokens per user from UserDeviceToken, fallback to User.fcm_token
+                tokens = []
                 for u in users:
-                    if not u.fcm_token:
-                        continue
-                    try:
-                        data_payload = json.loads(log.data_json) if log.data_json else {}
-                        message = messaging.Message(
-                            token=u.fcm_token,
-                            notification=messaging.Notification(title=log.title or '', body=log.body or ''),
-                            data={k: str(v) for k, v in data_payload.items()}
-                        )
-                        resp = messaging.send(message, app=firebase_app)
-                        sent += 1
-                    except Exception as e:
-                        errors += 1
-                        if len(error_samples) < 5:
-                            # Collect a few sample error messages for debugging
-                            error_samples.append(str(e))
-                        code = _classify_fcm_error(e)
-                        error_buckets[code] = error_buckets.get(code, 0) + 1
-                        if code == 'not_registered':
-                            users_to_null.append(u.id)
+                    devs = UserDeviceToken.query.filter_by(user_id=u.id, valid=True).all()
+                    if devs:
+                        tokens.extend([(d.token, u.id) for d in devs if d.token])
+                    elif u.fcm_token:
+                        tokens.append((u.fcm_token, u.id))
+
+                # Batch send (multicast) in chunks of 500
+                data_payload = json.loads(log.data_json) if log.data_json else {}
+                def chunk(lst, n):
+                    for i in range(0, len(lst), n):
+                        yield lst[i:i+n]
+
+                for batch in chunk(tokens, 500):
+                    token_list = [t for t, _ in batch]
+                    message = messaging.MulticastMessage(
+                        tokens=token_list,
+                        notification=messaging.Notification(title=log.title or '', body=log.body or ''),
+                        data={k: str(v) for k, v in data_payload.items()}
+                    )
+                    resp = messaging.send_multicast(message, app=firebase_app)
+                    sent += resp.success_count
+                    errors += resp.failure_count
+                    # Inspect per-token responses
+                    for idx, r in enumerate(resp.responses):
+                        if not r.success:
+                            e = r.exception
+                            if len(error_samples) < 5:
+                                error_samples.append(str(e))
+                            code = _classify_fcm_error(e)
+                            error_buckets[code] = error_buckets.get(code, 0) + 1
+                            if code == 'not_registered':
+                                users_to_null.append(batch[idx][1])
                 log.sent_count = sent
                 log.error_count = errors
                 log.status = 'sent' if errors == 0 else 'failed'
@@ -437,12 +451,16 @@ def delete_version(version_id):
 @admin_required
 def toggle_version_active(version_id):
     version = CityVersion.query.get_or_404(version_id)
-    
-    # Deactivate all other versions of this city
-    CityVersion.query.filter_by(city_id=version.city_id).update({'is_active': False})
-    
-    # Toggle the selected version
-    version.is_active = not version.is_active
+    # If currently active, simply deactivate this version
+    if version.is_active:
+        version.is_active = False
+    else:
+        # Deactivate other versions of the city, then activate this one
+        CityVersion.query.filter(
+            CityVersion.city_id == version.city_id,
+            CityVersion.id != version.id
+        ).update({'is_active': False})
+        version.is_active = True
     db.session.commit()
     
     return jsonify({'success': True, 'is_active': version.is_active})
