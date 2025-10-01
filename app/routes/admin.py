@@ -178,26 +178,48 @@ def notifications():
                     for i in range(0, len(lst), n):
                         yield lst[i:i+n]
 
-                for batch in chunk(tokens, 500):
-                    token_list = [t for t, _ in batch]
-                    message = messaging.MulticastMessage(
-                        tokens=token_list,
-                        notification=messaging.Notification(title=log.title or '', body=log.body or ''),
-                        data={k: str(v) for k, v in data_payload.items()}
-                    )
-                    resp = messaging.send_multicast(message, app=firebase_app)
-                    sent += resp.success_count
-                    errors += resp.failure_count
-                    # Inspect per-token responses
-                    for idx, r in enumerate(resp.responses):
-                        if not r.success:
-                            e = r.exception
+                try:
+                    # Preferred path: multicast (uses /batch). Some networks block this; we will fallback below.
+                    for batch in chunk(tokens, 500):
+                        token_list = [t for t, _ in batch]
+                        message = messaging.MulticastMessage(
+                            tokens=token_list,
+                            notification=messaging.Notification(title=log.title or '', body=log.body or ''),
+                            data={k: str(v) for k, v in data_payload.items()}
+                        )
+                        resp = messaging.send_multicast(message, app=firebase_app)
+                        sent += resp.success_count
+                        errors += resp.failure_count
+                        for idx, r in enumerate(resp.responses):
+                            if not r.success:
+                                e = r.exception
+                                if len(error_samples) < 5:
+                                    error_samples.append(str(e))
+                                code = _classify_fcm_error(e)
+                                error_buckets[code] = error_buckets.get(code, 0) + 1
+                                if code == 'not_registered':
+                                    users_to_null.append(batch[idx][1])
+                except Exception as e:
+                    # Fallback: per-token sends (avoids /batch). Slower but reliable.
+                    if len(error_samples) < 5:
+                        error_samples.append(f"multicast_failed:{str(e)}")
+                    for tok, uid in tokens:
+                        try:
+                            message = messaging.Message(
+                                token=tok,
+                                notification=messaging.Notification(title=log.title or '', body=log.body or ''),
+                                data={k: str(v) for k, v in data_payload.items()}
+                            )
+                            messaging.send(message, app=firebase_app)
+                            sent += 1
+                        except Exception as ie:
+                            errors += 1
                             if len(error_samples) < 5:
-                                error_samples.append(str(e))
-                            code = _classify_fcm_error(e)
+                                error_samples.append(str(ie))
+                            code = _classify_fcm_error(ie)
                             error_buckets[code] = error_buckets.get(code, 0) + 1
                             if code == 'not_registered':
-                                users_to_null.append(batch[idx][1])
+                                users_to_null.append(uid)
                 log.sent_count = sent
                 log.error_count = errors
                 log.status = 'sent' if errors == 0 else 'failed'
