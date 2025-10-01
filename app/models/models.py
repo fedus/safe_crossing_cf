@@ -41,6 +41,18 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+class NotificationLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.String(36))  # admin user id (uuid)
+    title = db.Column(db.String(200))
+    body = db.Column(db.Text)
+    data_json = db.Column(db.Text)
+    target_user_id = db.Column(db.String(36), nullable=True)  # for test sends
+    sent_count = db.Column(db.Integer, default=0)
+    error_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(32), default='logged')  # logged|sent|failed
+
 class City(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)

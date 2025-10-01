@@ -6,7 +6,7 @@
 <h2>Admin Dashboard</h2>
 
 <div class="row mt-4">
-    <div class="col-md-8">
+    <div class="col-md-7">
         <h3>Cities Overview</h3>
         <div class="table-responsive">
             <table class="table table-striped">
@@ -44,7 +44,7 @@
             </table>
         </div>
     </div>
-    <div class="col-md-4">
+    <div class="col-md-5">
         <h3>Settings</h3>
         <form method="POST" action="{{ url_for('admin.update_settings') }}">
             <div class="mb-3">
@@ -53,6 +53,57 @@
             </div>
             <button type="submit" class="btn btn-primary">Save</button>
         </form>
+
+        <hr>
+        <h3>Send Test Push</h3>
+        <form method="POST" action="{{ url_for('admin.notifications') }}">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control" id="title" name="title" placeholder="Test title">
+            </div>
+            <div class="mb-3">
+                <label for="body" class="form-label">Body</label>
+                <input type="text" class="form-control" id="body" name="body" placeholder="Test body">
+            </div>
+            <div class="mb-3">
+                <label for="data" class="form-label">Data JSON (optional)</label>
+                <textarea class="form-control" id="data" name="data" rows="3" placeholder='{"deeplink": "/some/path"}'></textarea>
+            </div>
+            <div class="mb-3">
+                <label for="target_user_id" class="form-label">Target User UUID</label>
+                <input type="text" class="form-control" id="target_user_id" name="target_user_id" placeholder="00000000-0000-0000-0000-000000000000" required>
+            </div>
+            <button type="submit" class="btn btn-warning">Send Test</button>
+        </form>
+
+        {% if notification_logs %}
+        <hr>
+        <h4>Recent Notifications</h4>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Sent</th>
+                        <th>Errors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in notification_logs %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ log.title }}</td>
+                        <td>{{ log.status }}</td>
+                        <td>{{ log.sent_count }}</td>
+                        <td>{{ log.error_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %} 

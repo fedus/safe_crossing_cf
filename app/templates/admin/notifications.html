@@ -1,0 +1,97 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Push Notifications{% endblock %}
+
+{% block content %}
+<h2>Push Notifications</h2>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <h3>Compose & Target</h3>
+        <form method="POST" action="{{ url_for('admin.notifications') }}">
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control" id="title" name="title" placeholder="Test title">
+            </div>
+            <div class="mb-3">
+                <label for="body" class="form-label">Body</label>
+                <input type="text" class="form-control" id="body" name="body" placeholder="Test body">
+            </div>
+            <div class="mb-3">
+                <label for="data" class="form-label">Data JSON (optional)</label>
+                <textarea class="form-control" id="data" name="data" rows="3" placeholder='{"deeplink": "/some/path"}'></textarea>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="city_id" class="form-label">City (optional)</label>
+                    <input type="number" class="form-control" id="city_id" name="city_id" placeholder="City ID">
+                </div>
+                <div class="col-md-6">
+                    <label for="version_id" class="form-label">Version (optional)</label>
+                    <input type="number" class="form-control" id="version_id" name="version_id" placeholder="Version ID">
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <label for="activity" class="form-label">Activity filter</label>
+                    <select id="activity" name="activity" class="form-select">
+                        <option value="">-- none --</option>
+                        <option value="never_voted">Never voted</option>
+                        <option value="inactive">Inactive for X days</option>
+                        <option value="has_unvoted">Has unvoted in scope</option>
+                        <option value="completed">Completed scope</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="inactive_days" class="form-label">X days (for inactive)</label>
+                    <input type="number" class="form-control" id="inactive_days" name="inactive_days" placeholder="e.g. 7">
+                </div>
+            </div>
+
+            <hr>
+            <div class="mb-3">
+                <label for="target_user_id" class="form-label">Target User UUID (for test)</label>
+                <input type="text" class="form-control" id="target_user_id" name="target_user_id" placeholder="00000000-0000-0000-0000-000000000000">
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" name="action" value="test" class="btn btn-warning">Send Test</button>
+                <button type="submit" name="action" value="preview" class="btn btn-info">Preview Segment</button>
+                <button type="submit" name="action" value="send" class="btn btn-primary">Send to Segment</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <h3>Recent Notifications</h3>
+        {% if notification_logs %}
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Title</th>
+                        <th>Status</th>
+                        <th>Sent</th>
+                        <th>Errors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in notification_logs %}
+                    <tr>
+                        <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ log.title }}</td>
+                        <td>{{ log.status }}</td>
+                        <td>{{ log.sent_count }}</td>
+                        <td>{{ log.error_count }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p class="text-muted">No notifications yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+
